@@ -38,6 +38,29 @@ Usage:
 
 Regex rules of geosite are ignored by default.
 
+## Compile for OpenWrt
+
+Download the latest Openwrt source and clone this repository to the package directory.
+
+```bash
+git clone https://github.com/snowie2000/geoview.git package/geoview
+```
+
+Follow the steps below to compile the package.
+
+```bash
+./scripts/feeds update -a
+./scripts/feeds install -a
+
+make menuconfig
+
+Network  ---> Web Servers/Proxies  ---> <*> geoview
+
+make package/geoview/{clean,compile} V=s
+```
+
+To compile the golang projects under `Linux/arm64`, you need to manually install golang and set external golang environment in the `make menuconfig` menu.
+
 -----
 
 ## Credit
