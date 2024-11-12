@@ -37,3 +37,9 @@ Usage:
 ```
 
 Regex rules of geosite are ignored by default.
+
+-----
+
+## Credit
+
+Great thanks to project [geoip](https://github.com/Loyalsoldier/geoip) and [geo](https://github.com/MetaCubeX/geo)
