@@ -6,9 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	singCst "github.com/sagernet/sing-box/constant"
-	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common"
+	"github.com/snowie2000/geoview/srs"
 )
 
 func extractV2GeoSite(geositeList []*GeoSite, wantList []string, regex bool) (list []string, itemlist []Item, err error) {
@@ -92,7 +91,7 @@ func Extract(file string, wantList []string, regex bool) ([]string, error) {
 }
 
 // to the ruleset json format of sing-box 1.20+
-func ToRuleSet(file string, wantList []string, regex bool) (*option.PlainRuleSetCompat, error) {
+func ToRuleSet(file string, wantList []string, regex bool) (*srs.PlainRuleSetCompat, error) {
 	fileContent, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -120,12 +119,12 @@ func ToRuleSet(file string, wantList []string, regex bool) (*option.PlainRuleSet
 	return nil, fmt.Errorf("Not a valid geosite format")
 }
 
-func itemToRuleset(itemlist []Item) (*option.PlainRuleSetCompat, error) {
-	ruleset := &option.PlainRuleSetCompat{
-		Version: singCst.RuleSetVersion1,
+func itemToRuleset(itemlist []Item) (*srs.PlainRuleSetCompat, error) {
+	ruleset := &srs.PlainRuleSetCompat{
+		Version: srs.RuleSetVersion1,
 	}
-	rule := option.HeadlessRule{
-		Type: singCst.RuleTypeDefault,
+	rule := srs.HeadlessRule{
+		Type: srs.RuleTypeDefault,
 	}
 	for _, it := range itemlist {
 		switch it.Type {
@@ -139,7 +138,7 @@ func itemToRuleset(itemlist []Item) (*option.PlainRuleSetCompat, error) {
 			rule.DefaultOptions.DomainSuffix = append(rule.DefaultOptions.DomainSuffix, it.Value)
 		}
 	}
-	ruleset.Options.Rules = []option.HeadlessRule{rule}
+	ruleset.Options.Rules = []srs.HeadlessRule{rule}
 	return ruleset, nil
 }
 

@@ -9,11 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sagernet/sing-box/common/srs"
-	"github.com/sagernet/sing-box/option"
-
 	"github.com/snowie2000/geoview/geoip"
 	"github.com/snowie2000/geoview/geosite"
+	"github.com/snowie2000/geoview/srs"
 )
 
 var (
@@ -184,7 +182,7 @@ func convert() {
 	}
 }
 
-func outputRulesetToFile(fileName string, ruleset *option.PlainRuleSetCompat) error {
+func outputRulesetToFile(fileName string, ruleset *srs.PlainRuleSetCompat) error {
 	if strings.EqualFold(filepath.Ext(fileName), ".json") {
 		//output json
 		if appendfile {
@@ -192,7 +190,7 @@ func outputRulesetToFile(fileName string, ruleset *option.PlainRuleSetCompat) er
 			file, err := os.OpenFile(fileName, os.O_RDONLY, 0666)
 			if err == nil {
 				// read old rules
-				var oldset option.PlainRuleSetCompat
+				var oldset srs.PlainRuleSetCompat
 				decoder := json.NewDecoder(file)
 				decoder.Decode(&oldset)
 				file.Close()
