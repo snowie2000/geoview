@@ -32,7 +32,7 @@ func (g *GeoIPDatIn) Extract(ipType IPType) (list []string, err error) {
 	}
 
 	if len(entries) == 0 {
-		return nil, fmt.Errorf("no entry is generated")
+		return nil, fmt.Errorf("no match countrycode found")
 	}
 
 	var ignoreIPType IgnoreIPOption

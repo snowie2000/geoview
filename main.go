@@ -19,16 +19,17 @@ func main() {
 	ipv6 := flag.Bool("ipv6", true, "enable ipv6 output")
 	regex := flag.Bool("regex", false, "allow regex rules in the geosite result")
 	output := flag.String("output", "", "output to file, leave empty to print to console")
+	appendfile := flag.Bool("append", false, "append to existing file instead of overwriting")
 	flag.Parse()
 
 	if *input == "" {
-		fmt.Printf("Error: Input file empty\nUsage:\n")
+		printErrorln("Error: Input file empty\nUsage:\n")
 		flag.PrintDefaults()
 		return
 	}
 
 	if *want == "" {
-		fmt.Printf("Error: List should not be empty\nUsage:\n")
+		printErrorln("Error: List should not be empty\nUsage:\n")
 		flag.PrintDefaults()
 		return
 	}
@@ -54,9 +55,9 @@ func main() {
 		ret, err := data.Extract(tp)
 		if err == nil {
 			if *output != "" { // output to file
-				err = outputToFile(*output, ret)
+				err = outputToFile(*output, ret, *appendfile)
 				if err != nil {
-					fmt.Println("Error:", err)
+					printErrorln("Error:", err)
 				}
 				return
 			}
@@ -64,7 +65,7 @@ func main() {
 				fmt.Println(v)
 			}
 		} else {
-			fmt.Println("Error:", err)
+			printErrorln("Error:", err)
 		}
 		return
 
@@ -76,9 +77,9 @@ func main() {
 		ret, err := geosite.Extract(*input, list, *regex)
 		if err == nil {
 			if *output != "" { // output to file
-				err = outputToFile(*output, ret)
+				err = outputToFile(*output, ret, *appendfile)
 				if err != nil {
-					fmt.Println("Error:", err)
+					printErrorln("Error:", err)
 				}
 				return
 			}
@@ -86,11 +87,60 @@ func main() {
 				fmt.Println(v)
 			}
 		} else {
-			fmt.Println("Error:", err)
+			printErrorln("Error:", err)
 		}
 	}
 }
 
-func outputToFile(file string, lines []string) error {
-	return os.WriteFile(file, []byte(strings.Join(lines, "\n")), 0o666)
+func outputToFile(fileName string, lines []string, appendfile bool) error {
+	var (
+		file *os.File
+		err  error
+	)
+	if appendfile {
+		file, err = os.OpenFile(fileName, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0666)
+	} else {
+		file, err = os.OpenFile(fileName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+	}
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	needsNewline := false
+
+	if appendfile {
+		fileInfo, err := os.Stat(fileName)
+		if err != nil {
+			return err
+		}
+
+		if fileInfo.Size() > 0 {
+			// Read the last byte to check if it's a newline
+			buf := make([]byte, 1)
+			_, err := file.ReadAt(buf, fileInfo.Size()-1)
+			if err != nil {
+				return err
+			}
+			if buf[0] != '\n' {
+				needsNewline = true
+			}
+		}
+	}
+
+	// If needed, write a newline before appending
+	if needsNewline {
+		if _, err = file.WriteString("\n"); err != nil {
+			return err
+		}
+	}
+	_, err = file.WriteString(strings.Join(lines, "\n"))
+	return err
+}
+
+func printErrorln(args ...any) {
+	fmt.Fprintln(os.Stderr, args...)
+}
+
+func printErrorf(str string, args ...any) {
+	fmt.Fprintf(os.Stderr, str, args...)
 }
