@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	singCst "github.com/sagernet/sing-box/constant"
+	"github.com/sagernet/sing-box/option"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -50,6 +52,23 @@ func (g *GeoIPDatIn) Extract(ipType IPType) (list []string, err error) {
 	}
 
 	return
+}
+
+func (g *GeoIPDatIn) ToRuleSet(ipType IPType) (*option.PlainRuleSetCompat, error) {
+	cidrlist, err := g.Extract(ipType)
+	if err != nil {
+		return nil, err
+	}
+
+	ruleset := &option.PlainRuleSetCompat{
+		Version: singCst.RuleSetVersion1,
+	}
+	rule := option.HeadlessRule{
+		Type: singCst.RuleTypeDefault,
+	}
+	rule.DefaultOptions.IPCIDR = cidrlist
+	ruleset.Options.Rules = []option.HeadlessRule{rule}
+	return ruleset, nil
 }
 
 func (g *GeoIPDatIn) parseFile(path string, entries map[string]*Entry) error {

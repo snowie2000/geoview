@@ -13,8 +13,8 @@ import (
 type IPIgnoreType string
 
 const (
-	IgIPv4 IPIgnoreType = "IPv4"
-	IgIPv6 IPIgnoreType = "IPv6"
+	IgIPv4 IPIgnoreType = "IgIPv4"
+	IgIPv6 IPIgnoreType = "IgIPv6"
 )
 
 type IgnoreIPOption func() IPIgnoreType
@@ -42,11 +42,11 @@ var (
 )
 
 type Entry struct {
-	name          string
-	IgIPv4Builder *netipx.IPSetBuilder
-	IgIPv6Builder *netipx.IPSetBuilder
-	IgIPv4Set     *netipx.IPSet
-	IgIPv6Set     *netipx.IPSet
+	name        string
+	IPv4Builder *netipx.IPSetBuilder
+	IPv6Builder *netipx.IPSetBuilder
+	IPv4Set     *netipx.IPSet
+	IPv6Set     *netipx.IPSet
 }
 
 func NewEntry(name string) *Entry {
@@ -59,41 +59,41 @@ func (e *Entry) GetName() string {
 	return e.name
 }
 
-func (e *Entry) hasIgIPv4Builder() bool {
-	return e.IgIPv4Builder != nil
+func (e *Entry) hasIPv4Builder() bool {
+	return e.IPv4Builder != nil
 }
 
-func (e *Entry) hasIgIPv6Builder() bool {
-	return e.IgIPv6Builder != nil
+func (e *Entry) hasIPv6Builder() bool {
+	return e.IPv6Builder != nil
 }
 
-func (e *Entry) hasIgIPv4Set() bool {
-	return e.IgIPv4Set != nil
+func (e *Entry) hasIPv4Set() bool {
+	return e.IPv4Set != nil
 }
 
-func (e *Entry) hasIgIPv6Set() bool {
-	return e.IgIPv6Set != nil
+func (e *Entry) hasIPv6Set() bool {
+	return e.IPv6Set != nil
 }
 
-func (e *Entry) GetIgIPv4Set() (*netipx.IPSet, error) {
+func (e *Entry) GetIPv4Set() (*netipx.IPSet, error) {
 	if err := e.buildIPSet(); err != nil {
 		return nil, err
 	}
 
-	if e.hasIgIPv4Set() {
-		return e.IgIPv4Set, nil
+	if e.hasIPv4Set() {
+		return e.IPv4Set, nil
 	}
 
 	return nil, fmt.Errorf("entry %s has no IgIPv4 set", e.GetName())
 }
 
-func (e *Entry) GetIgIPv6Set() (*netipx.IPSet, error) {
+func (e *Entry) GetIPv6Set() (*netipx.IPSet, error) {
 	if err := e.buildIPSet(); err != nil {
 		return nil, err
 	}
 
-	if e.hasIgIPv6Set() {
-		return e.IgIPv6Set, nil
+	if e.hasIPv6Set() {
+		return e.IPv6Set, nil
 	}
 
 	return nil, fmt.Errorf("entry %s has no IgIPv6 set", e.GetName())
@@ -281,15 +281,15 @@ func (e *Entry) processPrefix(src any) (*netip.Prefix, IPIgnoreType, error) {
 func (e *Entry) add(prefix *netip.Prefix, ipType IPIgnoreType) error {
 	switch ipType {
 	case IgIPv4:
-		if !e.hasIgIPv4Builder() {
-			e.IgIPv4Builder = new(netipx.IPSetBuilder)
+		if !e.hasIPv4Builder() {
+			e.IPv4Builder = new(netipx.IPSetBuilder)
 		}
-		e.IgIPv4Builder.AddPrefix(*prefix)
+		e.IPv4Builder.AddPrefix(*prefix)
 	case IgIPv6:
-		if !e.hasIgIPv6Builder() {
-			e.IgIPv6Builder = new(netipx.IPSetBuilder)
+		if !e.hasIPv6Builder() {
+			e.IPv6Builder = new(netipx.IPSetBuilder)
 		}
-		e.IgIPv6Builder.AddPrefix(*prefix)
+		e.IPv6Builder.AddPrefix(*prefix)
 	default:
 		return ErrInvalidIPType
 	}
@@ -300,12 +300,12 @@ func (e *Entry) add(prefix *netip.Prefix, ipType IPIgnoreType) error {
 func (e *Entry) remove(prefix *netip.Prefix, ipType IPIgnoreType) error {
 	switch ipType {
 	case IgIPv4:
-		if e.hasIgIPv4Builder() {
-			e.IgIPv4Builder.RemovePrefix(*prefix)
+		if e.hasIPv4Builder() {
+			e.IPv4Builder.RemovePrefix(*prefix)
 		}
 	case IgIPv6:
-		if e.hasIgIPv6Builder() {
-			e.IgIPv6Builder.RemovePrefix(*prefix)
+		if e.hasIPv6Builder() {
+			e.IPv6Builder.RemovePrefix(*prefix)
 		}
 	default:
 		return ErrInvalidIPType
@@ -337,20 +337,20 @@ func (e *Entry) RemovePrefix(cidr string) error {
 }
 
 func (e *Entry) buildIPSet() error {
-	if e.hasIgIPv4Builder() && !e.hasIgIPv4Set() {
-		IgIPv4set, err := e.IgIPv4Builder.IPSet()
+	if e.hasIPv4Builder() && !e.hasIPv4Set() {
+		IPv4set, err := e.IPv4Builder.IPSet()
 		if err != nil {
 			return err
 		}
-		e.IgIPv4Set = IgIPv4set
+		e.IPv4Set = IPv4set
 	}
 
-	if e.hasIgIPv6Builder() && !e.hasIgIPv6Set() {
-		IgIPv6set, err := e.IgIPv6Builder.IPSet()
+	if e.hasIPv6Builder() && !e.hasIPv6Set() {
+		IPv6set, err := e.IPv6Builder.IPSet()
 		if err != nil {
 			return err
 		}
-		e.IgIPv6Set = IgIPv6set
+		e.IPv6Set = IPv6set
 	}
 
 	return nil
@@ -363,12 +363,12 @@ func (e *Entry) MarshalPrefix(opts ...IgnoreIPOption) ([]netip.Prefix, error) {
 			ignoreIPType = opt()
 		}
 	}
-	disableIgIPv4, disableIgIPv6 := false, false
+	disableIPv4, disableIPv6 := false, false
 	switch ignoreIPType {
 	case IgIPv4:
-		disableIgIPv4 = true
+		disableIPv4 = true
 	case IgIPv6:
-		disableIgIPv6 = true
+		disableIPv6 = true
 	}
 
 	if err := e.buildIPSet(); err != nil {
@@ -377,12 +377,12 @@ func (e *Entry) MarshalPrefix(opts ...IgnoreIPOption) ([]netip.Prefix, error) {
 
 	prefixes := make([]netip.Prefix, 0, 1024)
 
-	if !disableIgIPv4 && e.hasIgIPv4Set() {
-		prefixes = append(prefixes, e.IgIPv4Set.Prefixes()...)
+	if !disableIPv4 && e.hasIPv4Set() {
+		prefixes = append(prefixes, e.IPv4Set.Prefixes()...)
 	}
 
-	if !disableIgIPv6 && e.hasIgIPv6Set() {
-		prefixes = append(prefixes, e.IgIPv6Set.Prefixes()...)
+	if !disableIPv6 && e.hasIPv6Set() {
+		prefixes = append(prefixes, e.IPv6Set.Prefixes()...)
 	}
 
 	if len(prefixes) > 0 {
@@ -399,12 +399,12 @@ func (e *Entry) MarshalIPRange(opts ...IgnoreIPOption) ([]netipx.IPRange, error)
 			ignoreIPType = opt()
 		}
 	}
-	disableIgIPv4, disableIgIPv6 := false, false
+	disableIPv4, disableIPv6 := false, false
 	switch ignoreIPType {
 	case IgIPv4:
-		disableIgIPv4 = true
+		disableIPv4 = true
 	case IgIPv6:
-		disableIgIPv6 = true
+		disableIPv6 = true
 	}
 
 	if err := e.buildIPSet(); err != nil {
@@ -413,12 +413,12 @@ func (e *Entry) MarshalIPRange(opts ...IgnoreIPOption) ([]netipx.IPRange, error)
 
 	ipranges := make([]netipx.IPRange, 0, 1024)
 
-	if !disableIgIPv4 && e.hasIgIPv4Set() {
-		ipranges = append(ipranges, e.IgIPv4Set.Ranges()...)
+	if !disableIPv4 && e.hasIPv4Set() {
+		ipranges = append(ipranges, e.IPv4Set.Ranges()...)
 	}
 
-	if !disableIgIPv6 && e.hasIgIPv6Set() {
-		ipranges = append(ipranges, e.IgIPv6Set.Ranges()...)
+	if !disableIPv6 && e.hasIPv6Set() {
+		ipranges = append(ipranges, e.IPv6Set.Ranges()...)
 	}
 
 	if len(ipranges) > 0 {
@@ -435,12 +435,12 @@ func (e *Entry) MarshalText(opts ...IgnoreIPOption) ([]string, error) {
 			ignoreIPType = opt()
 		}
 	}
-	disableIgIPv4, disableIgIPv6 := false, false
+	disableIPv4, disableIPv6 := false, false
 	switch ignoreIPType {
 	case IgIPv4:
-		disableIgIPv4 = true
+		disableIPv4 = true
 	case IgIPv6:
-		disableIgIPv6 = true
+		disableIPv6 = true
 	}
 
 	if err := e.buildIPSet(); err != nil {
@@ -449,14 +449,14 @@ func (e *Entry) MarshalText(opts ...IgnoreIPOption) ([]string, error) {
 
 	cidrList := make([]string, 0, 1024)
 
-	if !disableIgIPv4 && e.hasIgIPv4Set() {
-		for _, prefix := range e.IgIPv4Set.Prefixes() {
+	if !disableIPv4 && e.hasIPv4Set() {
+		for _, prefix := range e.IPv4Set.Prefixes() {
 			cidrList = append(cidrList, prefix.String())
 		}
 	}
 
-	if !disableIgIPv6 && e.hasIgIPv6Set() {
-		for _, prefix := range e.IgIPv6Set.Prefixes() {
+	if !disableIPv6 && e.hasIPv6Set() {
+		for _, prefix := range e.IPv6Set.Prefixes() {
 			cidrList = append(cidrList, prefix.String())
 		}
 	}

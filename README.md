@@ -7,7 +7,9 @@ Extract information from geoip and geosite files from Project X and Sing-box.
 ```
 Usage:
   -action string
-        action: geoip | geosite (default "geoip")
+        action: extract | convert (default "extract")
+  -append
+        append to existing file instead of overwriting
   -input string
         datafile
   -ipv4
@@ -20,6 +22,8 @@ Usage:
         output to file, leave empty to print to console
   -regex
         allow regex rules in the geosite result
+  -type string
+        datafile type: geoip | geosite (default "geoip")
 ```
 
 ### Examples
@@ -27,16 +31,34 @@ Usage:
 #### Extract IP ranges of China and Japan from geoip.dat
 
 ```bash
-./geoview -action geoip -input geoip.dat -list cn,jp -output cn_jp.txt
+./geoview -type geoip -input geoip.dat -list cn,jp -output cn_jp.txt
 ```
 
 ### Extract domain list of gfw from geosite.dat
 
 ```bash
-./geoview -action geosite -input geosite.dat -list gfw -output gfw.txt
+./geoview -type geosite -input geosite.dat -list gfw -output gfw.txt
 ```
 
-Regex rules of geosite are ignored by default.
+### Extract domain list of medium and convert into sing-box ruleset JSON
+
+```bash
+./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.json
+```
+
+### Extract domain list of medium and convert into sing-box ruleset binary
+```bash
+./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.srs
+```
+
+* Regex rules of geosite are ignored by default.
+
+* When using `-append=true` to ruleset and the output format is JSON, existing rules will be kept and new rules will be appended.
+
+* When converting geo files to ruleset, the output format is determined by file extensions. Without specifying the output file extension, the output format is always JSON.
+
+* Binary ruleset conversion doesn't support appending, it always creates a new file.
+
 
 ## Compile for OpenWrt
 

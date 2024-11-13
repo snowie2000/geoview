@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"sync/atomic"
 
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -114,7 +115,7 @@ func (r *GeoSiteReader) Read(code string) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	counter := rw.ReadCounter{Reader: r.reader}
+	counter := ReadCounter{Reader: r.reader}
 	domain := make([]Item, r.domainLength[code])
 	for i := range domain {
 		var (
@@ -133,4 +134,25 @@ func (r *GeoSiteReader) Read(code string) ([]Item, error) {
 	}
 	_, err = r.reader.Seek(int64(-index)-counter.Count(), io.SeekCurrent)
 	return domain, err
+}
+
+type ReadCounter struct {
+	io.Reader
+	count int64
+}
+
+func (r *ReadCounter) Read(p []byte) (n int, err error) {
+	n, err = r.Reader.Read(p)
+	if n > 0 {
+		atomic.AddInt64(&r.count, int64(n))
+	}
+	return
+}
+
+func (r *ReadCounter) Count() int64 {
+	return r.count
+}
+
+func (r *ReadCounter) Reset() {
+	atomic.StoreInt64(&r.count, 0)
 }

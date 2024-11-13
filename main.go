@@ -2,60 +2,89 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/sagernet/sing-box/common/srs"
+	"github.com/sagernet/sing-box/option"
 
 	"github.com/snowie2000/geoview/geoip"
 	"github.com/snowie2000/geoview/geosite"
 )
 
+var (
+	input      string
+	datatype   string
+	action     string
+	want       string
+	ipv4       bool
+	ipv6       bool
+	regex      bool
+	output     string
+	appendfile bool
+)
+
 func main() {
-	input := flag.String("input", "", "datafile")
-	action := flag.String("action", "geoip", "action: geoip | geosite")
-	want := flag.String("list", "", "comma separated site or geo list, e.g. \"cn,jp\" or \"youtube,google\"")
-	ipv4 := flag.Bool("ipv4", true, "enable ipv4 output")
-	ipv6 := flag.Bool("ipv6", true, "enable ipv6 output")
-	regex := flag.Bool("regex", false, "allow regex rules in the geosite result")
-	output := flag.String("output", "", "output to file, leave empty to print to console")
-	appendfile := flag.Bool("append", false, "append to existing file instead of overwriting")
+	flag.StringVar(&input, "input", "", "datafile")
+	flag.StringVar(&datatype, "type", "geoip", "datafile type: geoip | geosite")
+	flag.StringVar(&action, "action", "extract", "action: extract | convert")
+	flag.StringVar(&want, "list", "", "comma separated site or geo list, e.g. \"cn,jp\" or \"youtube,google\"")
+	flag.BoolVar(&ipv4, "ipv4", true, "enable ipv4 output")
+	flag.BoolVar(&ipv6, "ipv6", true, "enable ipv6 output")
+	flag.BoolVar(&regex, "regex", false, "allow regex rules in the geosite result")
+	flag.StringVar(&output, "output", "", "output to file, leave empty to print to console")
+	flag.BoolVar(&appendfile, "append", false, "append to existing file instead of overwriting")
 	flag.Parse()
 
-	if *input == "" {
+	if input == "" {
 		printErrorln("Error: Input file empty\nUsage:\n")
 		flag.PrintDefaults()
 		return
 	}
 
-	if *want == "" {
+	if want == "" {
 		printErrorln("Error: List should not be empty\nUsage:\n")
 		flag.PrintDefaults()
 		return
 	}
 
-	switch *action {
+	switch action {
+	case "extract":
+		extract()
+	case "convert":
+		convert()
+	default:
+		printErrorln("Error: unknown action:", action)
+	}
+}
+
+func extract() {
+	switch datatype {
 	case "geoip":
-		list := strings.Split(*want, ",")
+		list := strings.Split(want, ",")
 		wantMap := make(map[string]bool)
 		for _, v := range list {
 			wantMap[strings.ToUpper(strings.TrimSpace(v))] = true
 		}
 		data := &geoip.GeoIPDatIn{
-			URI:  *input,
+			URI:  input,
 			Want: wantMap,
 		}
 		var tp geoip.IPType = 0
-		if *ipv4 {
+		if ipv4 {
 			tp |= geoip.IPv4
 		}
-		if *ipv6 {
+		if ipv6 {
 			tp |= geoip.IPv6
 		}
 		ret, err := data.Extract(tp)
 		if err == nil {
-			if *output != "" { // output to file
-				err = outputToFile(*output, ret, *appendfile)
+			if output != "" { // output to file
+				err = outputToFile(output, ret, appendfile)
 				if err != nil {
 					printErrorln("Error:", err)
 				}
@@ -70,14 +99,14 @@ func main() {
 		return
 
 	case "geosite":
-		list := strings.Split(*want, ",")
+		list := strings.Split(want, ",")
 		for i, v := range list {
 			list[i] = strings.TrimSpace(v)
 		} // remove spaces
-		ret, err := geosite.Extract(*input, list, *regex)
+		ret, err := geosite.Extract(input, list, regex)
 		if err == nil {
-			if *output != "" { // output to file
-				err = outputToFile(*output, ret, *appendfile)
+			if output != "" { // output to file
+				err = outputToFile(output, ret, appendfile)
 				if err != nil {
 					printErrorln("Error:", err)
 				}
@@ -89,6 +118,101 @@ func main() {
 		} else {
 			printErrorln("Error:", err)
 		}
+	}
+}
+
+func convert() {
+	switch datatype {
+	case "geoip":
+		list := strings.Split(want, ",")
+		wantMap := make(map[string]bool)
+		for _, v := range list {
+			wantMap[strings.ToUpper(strings.TrimSpace(v))] = true
+		}
+		data := &geoip.GeoIPDatIn{
+			URI:  input,
+			Want: wantMap,
+		}
+		var tp geoip.IPType = 0
+		if ipv4 {
+			tp |= geoip.IPv4
+		}
+		if ipv6 {
+			tp |= geoip.IPv6
+		}
+		ret, err := data.ToRuleSet(tp)
+		if err == nil {
+			if output != "" { // output to file
+				err = outputRulesetToFile(output, ret)
+				if err != nil {
+					printErrorln("Error:", err)
+				}
+				return
+			}
+			// output json to stdout
+			stdjson := json.NewEncoder(os.Stdout)
+			if err = stdjson.Encode(*ret); err != nil {
+				printErrorln("Error:", err, ret)
+			}
+		} else {
+			printErrorln("Error:", err)
+		}
+		return
+
+	case "geosite":
+		list := strings.Split(want, ",")
+		for i, v := range list {
+			list[i] = strings.TrimSpace(v)
+		} // remove spaces
+		ret, err := geosite.ToRuleSet(input, list, regex)
+		if err == nil {
+			if output != "" { // output to file
+				err = outputRulesetToFile(output, ret)
+				if err != nil {
+					printErrorln("Error:", err)
+				}
+				return
+			}
+			// output json to stdout
+			stdjson := json.NewEncoder(os.Stdout)
+			if err = stdjson.Encode(*ret); err != nil {
+				printErrorln("Error:", err, ret)
+			}
+		} else {
+			printErrorln("Error:", err)
+		}
+	}
+}
+
+func outputRulesetToFile(fileName string, ruleset *option.PlainRuleSetCompat) error {
+	if strings.EqualFold(filepath.Ext(fileName), ".json") {
+		//output json
+		if appendfile {
+			// incremental json generation
+			file, err := os.OpenFile(fileName, os.O_RDONLY, 0666)
+			if err == nil {
+				// read old rules
+				var oldset option.PlainRuleSetCompat
+				decoder := json.NewDecoder(file)
+				decoder.Decode(&oldset)
+				file.Close()
+				ruleset.Options.Rules = append(oldset.Options.Rules, ruleset.Options.Rules...) // append new rules to the old ones
+			}
+		}
+		file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		encoder := json.NewEncoder(file)
+		return encoder.Encode(*ruleset) // generate new json
+	} else {
+		file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		return srs.Write(file, ruleset.Options, ruleset.Version != 1)
 	}
 }
 
