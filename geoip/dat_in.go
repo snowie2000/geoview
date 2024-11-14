@@ -50,6 +50,21 @@ func (g *GeoIPDatIn) Extract(ipType IPType) (list []string, err error) {
 		}
 	}
 
+	/*
+		var ranges []cidr.IRange
+		for _, v := range list {
+			if r, err := cidr.ParseRange(v); err == nil {
+				ranges = append(ranges, r)
+			}
+		}
+		ranges = cidr.SortAndMerge(ranges)
+		list = nil
+		for _, r := range ranges {
+			for _, n := range r.ToIpNets() {
+				list = append(list, n.String())
+			}
+		}
+	*/
 	return
 }
 

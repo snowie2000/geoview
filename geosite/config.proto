@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-package geo.encoding.v2raygeo;
-option go_package = "github.com/metacubex/geo/encoding/v2raygeo";
+package geoview.geosite;
+option go_package = "github.com/snowie2000/geoview/geosite";
 
 // Domain for routing decision.
 message Domain {
