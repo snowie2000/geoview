@@ -10,7 +10,7 @@ import (
 	"github.com/snowie2000/geoview/srs"
 )
 
-func extractV2GeoSite(geositeList []*GeoSite, wantList []string, regex bool) (list []string, itemlist []Item, err error) {
+func extractV2GeoSite(geositeList []GeoSite, wantList []string, regex bool) (list []string, itemlist []Item, err error) {
 	want := make(map[string]bool)
 	for _, v := range wantList {
 		want[strings.ToUpper(v)] = true
@@ -18,7 +18,7 @@ func extractV2GeoSite(geositeList []*GeoSite, wantList []string, regex bool) (li
 
 	for _, site := range geositeList {
 		if v, ok := want[strings.ToUpper(site.CountryCode)]; ok && v {
-			domains := processGeositeEntry(site)
+			domains := processGeositeEntry(&site)
 			for _, it := range domains {
 				switch it.Type {
 				case RuleTypeDomainRegex:
@@ -66,8 +66,8 @@ func Extract(file string, wantList []string, regex bool) ([]string, error) {
 		return nil, err
 	}
 
-	var geositeList []*GeoSite
-	geositeList, err = LoadV2Site(fileContent)
+	var geositeList []GeoSite
+	geositeList, err = LoadV2Site(fileContent, wantList)
 	if err == nil {
 		domains, _, err := extractV2GeoSite(geositeList, wantList, regex)
 		if err == nil {
@@ -97,8 +97,8 @@ func ToRuleSet(file string, wantList []string, regex bool) (*srs.PlainRuleSetCom
 		return nil, err
 	}
 
-	var geositeList []*GeoSite
-	geositeList, err = LoadV2Site(fileContent)
+	var geositeList []GeoSite
+	geositeList, err = LoadV2Site(fileContent, wantList)
 	if err == nil {
 		_, itemlist, err := extractV2GeoSite(geositeList, wantList, regex)
 		if err == nil {
