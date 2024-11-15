@@ -105,9 +105,7 @@ func (g *GeoIPDatIn) generateEntries(reader io.Reader, entries map[string]*Entry
 	if err != nil {
 		return err
 	}
-	counter := 0
-
-	entry := NewEntry("global")
+	ipStrList := make([]string, 0)
 	for code := range g.Want {
 		var geoip GeoIP
 		stripped := protohelper.FindCode(geoipBytes, []byte(code))
@@ -116,19 +114,27 @@ func (g *GeoIPDatIn) generateEntries(reader io.Reader, entries map[string]*Entry
 
 			for _, v2rayCIDR := range geoip.Cidr {
 				ipStr := net.IP(v2rayCIDR.GetIp()).String() + "/" + fmt.Sprint(v2rayCIDR.GetPrefix())
-				if err := entry.AddPrefix(ipStr); err != nil {
-					return err
-				}
-				if counter++; counter > 10000 {
-					runtime.GC()
-					counter = 0
-				}
+				ipStrList = append(ipStrList, ipStr)
 			}
 		} else {
 			// log.Println("code not found", code)
 		}
 	}
-	entries["global"] = entry
 
+	geoipBytes = nil
+	runtime.GC()
+
+	entry := NewEntry("global")
+	counter := 0
+	for _, ip := range ipStrList {
+		if err := entry.AddPrefix(ip); err != nil {
+			return err
+		}
+		if counter++; counter > 10000 {
+			runtime.GC()
+			counter = 0
+		}
+	}
+	entries["global"] = entry
 	return nil
 }
