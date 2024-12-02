@@ -9,6 +9,7 @@ import (
 
 	"github.com/snowie2000/geoview/protohelper"
 	"github.com/snowie2000/geoview/srs"
+	"go4.org/netipx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -23,6 +24,54 @@ const (
 	IPv4 IPType = 1
 	IPv6 IPType = 2
 )
+
+func (g *GeoIPDatIn) FindIP(ip string) (list []string) {
+	nip, ok := netipx.FromStdIP(net.ParseIP(ip))
+	if !ok {
+		return
+	}
+
+	// read from url or file
+	file, err := os.Open(g.URI)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+	geoipBytes, err := io.ReadAll(file)
+	if err != nil {
+		return
+	}
+
+	codeList := protohelper.CodeList(geoipBytes) // get all available geoip codes
+	for _, code := range codeList {
+		var geoip GeoIP
+		stripped := protohelper.FindCode(geoipBytes, code)
+		if stripped != nil {
+			proto.Unmarshal(stripped, &geoip)
+			entry := NewEntry("finder")
+			for _, v2rayCIDR := range geoip.Cidr {
+				ipStr := net.IP(v2rayCIDR.GetIp()).String() + "/" + fmt.Sprint(v2rayCIDR.GetPrefix())
+				if err := entry.AddPrefix(ipStr); err != nil {
+					return
+				}
+			}
+			if nip.Is4() {
+				// ipv4 check
+				if s, err := entry.GetIPv4Set(); err == nil && s.Contains(nip) {
+					list = append(list, string(code))
+				}
+			} else {
+				// ipv6 check
+				if s, err := entry.GetIPv6Set(); err == nil && s.Contains(nip) {
+					list = append(list, string(code))
+				}
+			}
+		} else {
+			// log.Println("code not found", code)
+		}
+	}
+	return
+}
 
 func (g *GeoIPDatIn) Extract(ipType IPType) (list []string, err error) {
 	entries := make(map[string]*Entry)

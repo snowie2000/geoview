@@ -23,18 +23,20 @@ var (
 	ipv6       bool
 	regex      bool
 	output     string
+	target     string
 	appendfile bool
 )
 
 func main() {
 	flag.StringVar(&input, "input", "", "datafile")
 	flag.StringVar(&datatype, "type", "geoip", "datafile type: geoip | geosite")
-	flag.StringVar(&action, "action", "extract", "action: extract | convert")
+	flag.StringVar(&action, "action", "extract", "action: extract | convert | lookup")
 	flag.StringVar(&want, "list", "", "comma separated site or geo list, e.g. \"cn,jp\" or \"youtube,google\"")
 	flag.BoolVar(&ipv4, "ipv4", true, "enable ipv4 output")
 	flag.BoolVar(&ipv6, "ipv6", true, "enable ipv6 output")
 	flag.BoolVar(&regex, "regex", false, "allow regex rules in the geosite result")
 	flag.StringVar(&output, "output", "", "output to file, leave empty to print to console")
+	flag.StringVar(&target, "value", "", "ip or domain to lookup, required only for lookup action")
 	flag.BoolVar(&appendfile, "append", false, "append to existing file instead of overwriting")
 	flag.Parse()
 
@@ -44,17 +46,28 @@ func main() {
 		return
 	}
 
-	if want == "" {
-		printErrorln("Error: List should not be empty\nUsage:\n")
-		flag.PrintDefaults()
-		return
-	}
-
 	switch action {
 	case "extract":
+		if want == "" {
+			printErrorln("Error: List should not be empty\nUsage:\n")
+			flag.PrintDefaults()
+			return
+		}
 		extract()
 	case "convert":
+		if want == "" {
+			printErrorln("Error: List should not be empty\nUsage:\n")
+			flag.PrintDefaults()
+			return
+		}
 		convert()
+	case "lookup":
+		if target == "" {
+			printErrorln("Error: Target should not be empty\nUsage:\n")
+			flag.PrintDefaults()
+			return
+		}
+		lookup()
 	default:
 		printErrorln("Error: unknown action:", action)
 	}
@@ -179,6 +192,21 @@ func convert() {
 		} else {
 			printErrorln("Error:", err)
 		}
+	}
+}
+
+func lookup() {
+	switch datatype {
+	case "geoip":
+		data := &geoip.GeoIPDatIn{
+			URI: input,
+		}
+		list := data.FindIP(target)
+		for _, code := range list {
+			fmt.Println(code)
+		}
+	case "geosite":
+		printErrorln("Not implemented")
 	}
 }
 

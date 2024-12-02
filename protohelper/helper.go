@@ -35,6 +35,34 @@ func FindCode(data, code []byte) []byte {
 	}
 }
 
+func CodeList(data []byte) (list [][]byte) {
+	for {
+		dataL := len(data)
+		if dataL < 2 {
+			return
+		}
+		x, y := decodeVarint(data[1:])
+		if x == 0 && y == 0 {
+			return
+		}
+		headL, bodyL := 1+y, int(x)
+		dataL -= headL
+		if dataL < bodyL {
+			return
+		}
+		data = data[headL:]
+		size := data[1]
+		if size > 0 {
+			list = append(list, data[2:size+2])
+		}
+		if dataL == bodyL {
+			return
+		}
+		data = data[bodyL:]
+	}
+	return
+}
+
 func decodeVarint(buf []byte) (x uint64, n int) {
 	for shift := uint(0); shift < 64; shift += 7 {
 		if n >= len(buf) {
