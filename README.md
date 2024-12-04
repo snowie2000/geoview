@@ -7,7 +7,7 @@ Extract information from geoip and geosite files from Project X and Sing-box.
 ```
 Usage:
   -action string
-        action: extract | convert (default "extract")
+        action: extract | convert | lookup (default "extract")
   -append
         append to existing file instead of overwriting
   -input string
@@ -18,12 +18,16 @@ Usage:
         enable ipv6 output (default true)
   -list string
         comma separated site or geo list, e.g. "cn,jp" or "youtube,google"
+  -lowmem
+        low memory mode, reduce memory cost by partial file reading
   -output string
         output to file, leave empty to print to console
   -regex
         allow regex rules in the geosite result
   -type string
         datafile type: geoip | geosite (default "geoip")
+  -value string
+        ip or domain to lookup, required only for lookup action
 ```
 
 ### Examples
@@ -59,6 +63,8 @@ Usage:
 
 * Binary ruleset conversion doesn't support appending, it always creates a new file.
 
+### Low memory mode
+By adding `-lowmem` to the command, the program will read the file partially to reduce memory usage. This is useful when execute on devices with limited memory.
 
 ## Compile for OpenWrt
 

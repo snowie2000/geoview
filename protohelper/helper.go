@@ -1,6 +1,11 @@
 // helper
 package protohelper
 
+import (
+	"io"
+	"log"
+)
+
 func FindCode(data, code []byte) []byte {
 	codeL := len(code)
 	if codeL == 0 {
@@ -31,8 +36,85 @@ func FindCode(data, code []byte) []byte {
 		if dataL == bodyL {
 			return nil
 		}
+		// log.Println(bodyL, data[1])
 		data = data[bodyL:]
 	}
+}
+
+func FindCodeByReader(data io.ReadSeeker, code []byte) []byte {
+	codeL := len(code)
+	if codeL == 0 {
+		return nil
+	}
+	var (
+		header []byte = make([]byte, 30)
+		count  int
+		err    error
+	)
+	for {
+		if count, err = io.ReadAtLeast(data, header, 2); err != nil {
+			return nil
+		}
+		x, y := decodeVarint(header[1:])
+		if x == 0 && y == 0 {
+			return nil
+		}
+		headL, bodyL := 1+y, int(x)
+		data.Seek(int64(headL-count), io.SeekCurrent)
+		if _, err = io.ReadFull(data, header[:2]); err != nil {
+			return nil
+		}
+		size := header[1]
+		if int(size) == codeL {
+			c := make([]byte, size)
+			_, err = io.ReadFull(data, c)
+			for i := 0; i < codeL && c[i] == code[i]; i++ {
+				if i+1 == codeL {
+					body := make([]byte, bodyL)
+					data.Seek(-int64(size)-2, io.SeekCurrent)
+					if _, err = io.ReadFull(data, body); err == nil {
+						return body
+					} else {
+						return nil
+					}
+				}
+			}
+		} else {
+			size = 0 // do not include size in the seek
+		}
+		data.Seek(int64(bodyL-2-int(size)), io.SeekCurrent)
+	}
+}
+
+func CodeListByReader(data io.ReadSeeker) (list [][]byte) {
+	var (
+		header []byte = make([]byte, 30)
+		count  int
+		err    error
+	)
+	for {
+		if count, err = io.ReadAtLeast(data, header, 2); err != nil {
+			return
+		}
+		x, y := decodeVarint(header[1:])
+		if x == 0 && y == 0 {
+			return
+		}
+		headL, bodyL := 1+y, int(x)
+		data.Seek(int64(headL-count), io.SeekCurrent)
+		if _, err = io.ReadFull(data, header[:2]); err != nil {
+			return
+		}
+		size := header[1]
+		if size > 0 {
+			code := make([]byte, size)
+			_, err = io.ReadFull(data, code)
+			list = append(list, code)
+		}
+		// log.Println(bodyL, size)
+		data.Seek(int64(bodyL-2-int(size)), io.SeekCurrent)
+	}
+	return
 }
 
 func CodeList(data []byte) (list [][]byte) {
@@ -66,6 +148,7 @@ func CodeList(data []byte) (list [][]byte) {
 func decodeVarint(buf []byte) (x uint64, n int) {
 	for shift := uint(0); shift < 64; shift += 7 {
 		if n >= len(buf) {
+			log.Println(n, len(buf), "out of length")
 			return 0, 0
 		}
 		b := uint64(buf[n])

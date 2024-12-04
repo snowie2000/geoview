@@ -11,91 +11,80 @@ import (
 
 	"github.com/snowie2000/geoview/geoip"
 	"github.com/snowie2000/geoview/geosite"
+	"github.com/snowie2000/geoview/global"
 	"github.com/snowie2000/geoview/srs"
 )
 
-var (
-	input      string
-	datatype   string
-	action     string
-	want       string
-	ipv4       bool
-	ipv6       bool
-	regex      bool
-	output     string
-	target     string
-	appendfile bool
-)
-
 func main() {
-	flag.StringVar(&input, "input", "", "datafile")
-	flag.StringVar(&datatype, "type", "geoip", "datafile type: geoip | geosite")
-	flag.StringVar(&action, "action", "extract", "action: extract | convert | lookup")
-	flag.StringVar(&want, "list", "", "comma separated site or geo list, e.g. \"cn,jp\" or \"youtube,google\"")
-	flag.BoolVar(&ipv4, "ipv4", true, "enable ipv4 output")
-	flag.BoolVar(&ipv6, "ipv6", true, "enable ipv6 output")
-	flag.BoolVar(&regex, "regex", false, "allow regex rules in the geosite result")
-	flag.StringVar(&output, "output", "", "output to file, leave empty to print to console")
-	flag.StringVar(&target, "value", "", "ip or domain to lookup, required only for lookup action")
-	flag.BoolVar(&appendfile, "append", false, "append to existing file instead of overwriting")
+	flag.StringVar(&global.Input, "input", "", "datafile")
+	flag.StringVar(&global.Datatype, "type", "geoip", "datafile type: geoip | geosite")
+	flag.StringVar(&global.Action, "action", "extract", "action: extract | convert | lookup")
+	flag.StringVar(&global.Want, "list", "", "comma separated site or geo list, e.g. \"cn,jp\" or \"youtube,google\"")
+	flag.BoolVar(&global.Ipv4, "ipv4", true, "enable ipv4 output")
+	flag.BoolVar(&global.Ipv6, "ipv6", true, "enable ipv6 output")
+	flag.BoolVar(&global.Regex, "regex", false, "allow regex rules in the geosite result")
+	flag.StringVar(&global.Output, "output", "", "output to file, leave empty to print to console")
+	flag.StringVar(&global.Target, "value", "", "ip or domain to lookup, required only for lookup action")
+	flag.BoolVar(&global.Appendfile, "append", false, "append to existing file instead of overwriting")
+	flag.BoolVar(&global.Lowmem, "lowmem", false, "low memory mode, reduce memory cost by partial file reading")
 	flag.Parse()
 
-	if input == "" {
+	if global.Input == "" {
 		printErrorln("Error: Input file empty\nUsage:\n")
 		flag.PrintDefaults()
 		return
 	}
 
-	switch action {
+	switch global.Action {
 	case "extract":
-		if want == "" {
+		if global.Want == "" {
 			printErrorln("Error: List should not be empty\nUsage:\n")
 			flag.PrintDefaults()
 			return
 		}
 		extract()
 	case "convert":
-		if want == "" {
+		if global.Want == "" {
 			printErrorln("Error: List should not be empty\nUsage:\n")
 			flag.PrintDefaults()
 			return
 		}
 		convert()
 	case "lookup":
-		if target == "" {
+		if global.Target == "" {
 			printErrorln("Error: Target should not be empty\nUsage:\n")
 			flag.PrintDefaults()
 			return
 		}
 		lookup()
 	default:
-		printErrorln("Error: unknown action:", action)
+		printErrorln("Error: unknown action:", global.Action)
 	}
 }
 
 func extract() {
-	switch datatype {
+	switch global.Datatype {
 	case "geoip":
-		list := strings.Split(want, ",")
+		list := strings.Split(global.Want, ",")
 		wantMap := make(map[string]bool)
 		for _, v := range list {
 			wantMap[strings.ToUpper(strings.TrimSpace(v))] = true
 		}
 		data := &geoip.GeoIPDatIn{
-			URI:  input,
+			URI:  global.Input,
 			Want: wantMap,
 		}
 		var tp geoip.IPType = 0
-		if ipv4 {
+		if global.Ipv4 {
 			tp |= geoip.IPv4
 		}
-		if ipv6 {
+		if global.Ipv6 {
 			tp |= geoip.IPv6
 		}
 		ret, err := data.Extract(tp)
 		if err == nil {
-			if output != "" { // output to file
-				err = outputToFile(output, ret, appendfile)
+			if global.Output != "" { // output to file
+				err = outputToFile(global.Output, ret, global.Appendfile)
 				if err != nil {
 					printErrorln("Error:", err)
 				}
@@ -110,14 +99,14 @@ func extract() {
 		return
 
 	case "geosite":
-		list := strings.Split(want, ",")
+		list := strings.Split(global.Want, ",")
 		for i, v := range list {
 			list[i] = strings.TrimSpace(v)
 		} // remove spaces
-		ret, err := geosite.Extract(input, list, regex)
+		ret, err := geosite.Extract(global.Input, list, global.Regex)
 		if err == nil {
-			if output != "" { // output to file
-				err = outputToFile(output, ret, appendfile)
+			if global.Output != "" { // output to file
+				err = outputToFile(global.Output, ret, global.Appendfile)
 				if err != nil {
 					printErrorln("Error:", err)
 				}
@@ -133,28 +122,28 @@ func extract() {
 }
 
 func convert() {
-	switch datatype {
+	switch global.Datatype {
 	case "geoip":
-		list := strings.Split(want, ",")
+		list := strings.Split(global.Want, ",")
 		wantMap := make(map[string]bool)
 		for _, v := range list {
 			wantMap[strings.ToUpper(strings.TrimSpace(v))] = true
 		}
 		data := &geoip.GeoIPDatIn{
-			URI:  input,
+			URI:  global.Input,
 			Want: wantMap,
 		}
 		var tp geoip.IPType = 0
-		if ipv4 {
+		if global.Ipv4 {
 			tp |= geoip.IPv4
 		}
-		if ipv6 {
+		if global.Ipv6 {
 			tp |= geoip.IPv6
 		}
 		ret, err := data.ToRuleSet(tp)
 		if err == nil {
-			if output != "" { // output to file
-				err = outputRulesetToFile(output, ret)
+			if global.Output != "" { // output to file
+				err = outputRulesetToFile(global.Output, ret)
 				if err != nil {
 					printErrorln("Error:", err)
 				}
@@ -171,14 +160,14 @@ func convert() {
 		return
 
 	case "geosite":
-		list := strings.Split(want, ",")
+		list := strings.Split(global.Want, ",")
 		for i, v := range list {
 			list[i] = strings.TrimSpace(v)
 		} // remove spaces
-		ret, err := geosite.ToRuleSet(input, list, regex)
+		ret, err := geosite.ToRuleSet(global.Input, list, global.Regex)
 		if err == nil {
-			if output != "" { // output to file
-				err = outputRulesetToFile(output, ret)
+			if global.Output != "" { // output to file
+				err = outputRulesetToFile(global.Output, ret)
 				if err != nil {
 					printErrorln("Error:", err)
 				}
@@ -196,12 +185,12 @@ func convert() {
 }
 
 func lookup() {
-	switch datatype {
+	switch global.Datatype {
 	case "geoip":
 		data := &geoip.GeoIPDatIn{
-			URI: input,
+			URI: global.Input,
 		}
-		list := data.FindIP(target)
+		list := data.FindIP(global.Target)
 		for _, code := range list {
 			fmt.Println(code)
 		}
@@ -213,7 +202,7 @@ func lookup() {
 func outputRulesetToFile(fileName string, ruleset *srs.PlainRuleSetCompat) error {
 	if strings.EqualFold(filepath.Ext(fileName), ".json") {
 		//output json
-		if appendfile {
+		if global.Appendfile {
 			// incremental json generation
 			file, err := os.OpenFile(fileName, os.O_RDONLY, 0666)
 			if err == nil {
