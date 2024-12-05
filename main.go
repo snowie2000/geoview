@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,45 +16,62 @@ import (
 	"github.com/snowie2000/geoview/srs"
 )
 
+var (
+	version bool
+)
+
+const (
+	VERSION string = "0.0.8"
+)
+
 func main() {
-	flag.StringVar(&global.Input, "input", "", "datafile")
-	flag.StringVar(&global.Datatype, "type", "geoip", "datafile type: geoip | geosite")
-	flag.StringVar(&global.Action, "action", "extract", "action: extract | convert | lookup")
-	flag.StringVar(&global.Want, "list", "", "comma separated site or geo list, e.g. \"cn,jp\" or \"youtube,google\"")
-	flag.BoolVar(&global.Ipv4, "ipv4", true, "enable ipv4 output")
-	flag.BoolVar(&global.Ipv6, "ipv6", true, "enable ipv6 output")
-	flag.BoolVar(&global.Regex, "regex", false, "allow regex rules in the geosite result")
-	flag.StringVar(&global.Output, "output", "", "output to file, leave empty to print to console")
-	flag.StringVar(&global.Target, "value", "", "ip or domain to lookup, required only for lookup action")
-	flag.BoolVar(&global.Appendfile, "append", false, "append to existing file instead of overwriting")
-	flag.BoolVar(&global.Lowmem, "lowmem", false, "low memory mode, reduce memory cost by partial file reading")
-	flag.Parse()
+	myflag := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	myflag.StringVar(&global.Input, "input", "", "datafile")
+	myflag.StringVar(&global.Datatype, "type", "geoip", "datafile type: geoip | geosite")
+	myflag.StringVar(&global.Action, "action", "extract", "action: extract | convert | lookup")
+	myflag.StringVar(&global.Want, "list", "", "comma separated site or geo list, e.g. \"cn,jp\" or \"youtube,google\"")
+	myflag.BoolVar(&global.Ipv4, "ipv4", true, "enable ipv4 output")
+	myflag.BoolVar(&global.Ipv6, "ipv6", true, "enable ipv6 output")
+	myflag.BoolVar(&global.Regex, "regex", false, "allow regex rules in the geosite result")
+	myflag.StringVar(&global.Output, "output", "", "output to file, leave empty to print to console")
+	myflag.StringVar(&global.Target, "value", "", "ip or domain to lookup, required only for lookup action")
+	myflag.BoolVar(&global.Appendfile, "append", false, "append to existing file instead of overwriting")
+	myflag.BoolVar(&global.Lowmem, "lowmem", false, "low memory mode, reduce memory cost by partial file reading")
+	myflag.BoolVar(&version, "version", false, "print version")
+	myflag.SetOutput(io.Discard)
+	myflag.Parse(os.Args[1:])
+	myflag.SetOutput(nil)
+
+	if version {
+		fmt.Printf("Geoview %s\n", VERSION)
+		return
+	}
 
 	if global.Input == "" {
-		printErrorln("Error: Input file empty\nUsage:\n")
-		flag.PrintDefaults()
+		printErrorln("Error: Input file empty\n")
+		myflag.Usage()
 		return
 	}
 
 	switch global.Action {
 	case "extract":
 		if global.Want == "" {
-			printErrorln("Error: List should not be empty\nUsage:\n")
-			flag.PrintDefaults()
+			printErrorln("Error: List should not be empty\n")
+			myflag.Usage()
 			return
 		}
 		extract()
 	case "convert":
 		if global.Want == "" {
-			printErrorln("Error: List should not be empty\nUsage:\n")
-			flag.PrintDefaults()
+			printErrorln("Error: List should not be empty\n")
+			myflag.Usage()
 			return
 		}
 		convert()
 	case "lookup":
 		if global.Target == "" {
-			printErrorln("Error: Target should not be empty\nUsage:\n")
-			flag.PrintDefaults()
+			printErrorln("Error: Target should not be empty\n")
+			myflag.Usage()
 			return
 		}
 		lookup()
