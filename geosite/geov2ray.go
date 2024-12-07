@@ -10,10 +10,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func LoadV2Site(geositeBytes []byte, wantList []string) ([]GeoSite, error) {
+func LoadV2Site(geositeBytes []byte, wantList map[string][]string) ([]GeoSite, error) {
 	var geosite GeoSite
 	var geositeList []GeoSite
-	for _, code := range wantList {
+	for code := range wantList {
 		found := protohelper.FindCode(geositeBytes, []byte(strings.ToUpper(code)))
 		if found != nil {
 			if err := proto.Unmarshal(found, &geosite); err != nil {
@@ -25,7 +25,7 @@ func LoadV2Site(geositeBytes []byte, wantList []string) ([]GeoSite, error) {
 	return geositeList, nil
 }
 
-func LoadV2SiteFromFile(filename string, wantList []string) ([]GeoSite, error) {
+func LoadV2SiteFromFile(filename string, wantList map[string][]string) ([]GeoSite, error) {
 	geositeBytes, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, E.Cause(err, "failed to load V2Ray GeoSite database")

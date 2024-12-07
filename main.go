@@ -21,7 +21,7 @@ var (
 )
 
 const (
-	VERSION string = "0.0.8"
+	VERSION string = "0.0.9"
 )
 
 func main() {
@@ -118,10 +118,12 @@ func extract() {
 
 	case "geosite":
 		list := strings.Split(global.Want, ",")
-		for i, v := range list {
-			list[i] = strings.TrimSpace(v)
-		} // remove spaces
-		ret, err := geosite.Extract(global.Input, list, global.Regex)
+		wantMap := make(map[string][]string)
+		for _, v := range list {
+			parts := strings.Split(strings.ToLower(v), "@") // attributes are lowercased
+			wantMap[strings.ToUpper(parts[0])] = parts[1:]
+		}
+		ret, err := geosite.Extract(global.Input, wantMap, global.Regex)
 		if err == nil {
 			if global.Output != "" { // output to file
 				err = outputToFile(global.Output, ret, global.Appendfile)
@@ -179,10 +181,12 @@ func convert() {
 
 	case "geosite":
 		list := strings.Split(global.Want, ",")
-		for i, v := range list {
-			list[i] = strings.TrimSpace(v)
-		} // remove spaces
-		ret, err := geosite.ToRuleSet(global.Input, list, global.Regex)
+		wantMap := make(map[string][]string)
+		for _, v := range list {
+			parts := strings.Split(strings.ToLower(v), "@") // attributes are lowercased
+			wantMap[strings.ToUpper(parts[0])] = parts[1:]
+		}
+		ret, err := geosite.ToRuleSet(global.Input, wantMap, global.Regex)
 		if err == nil {
 			if global.Output != "" { // output to file
 				err = outputRulesetToFile(global.Output, ret)

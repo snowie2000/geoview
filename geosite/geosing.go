@@ -22,6 +22,7 @@ const (
 
 type Item struct {
 	Type  ItemType
+	Attr  map[string]struct{}
 	Value string
 }
 
