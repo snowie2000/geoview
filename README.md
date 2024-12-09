@@ -63,6 +63,41 @@ Usage:
 
 * Binary ruleset conversion doesn't support appending, it always creates a new file.
 
+-------
+
+### Lookup IPs and Domains
+
+The `-action lookup` flag will search for your target ip or domain in the geoip or geosite file and output all the list codes that contain the desired IP or domain, including all possible domain attributes (no support for sing-box geosite)
+
+#### Lookup an IP address
+```
+./geoview.exe -input geoip.dat -type geoip -action lookup -value 1.1.1.1
+AU
+CLOUDFLARE
+```
+
+#### Lookup a domain
+```
+./geoview.exe -input geosite.dat -type geosite -action lookup -value samsung
+TLD-!CN
+PRIVATE
+CATEGORY-COMPANIES
+SAMSUNG
+GEOLOCATION-!CN
+```
+
+```
+./geoview.exe -input geosite.dat -type geosite -action lookup -value xp.apple.com
+APPLE
+APPLE@cn
+APPLE-CN
+CATEGORY-COMPANIES
+CATEGORY-COMPANIES@cn
+GEOLOCATION-!CN
+APPLE-UPDATE
+```
+
+
 ### Low memory mode
 By adding `-lowmem` to the command, the program will read the file partially to reduce memory usage. This is useful when execute on devices with limited memory.
 
