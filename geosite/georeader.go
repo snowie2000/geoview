@@ -1,28 +1,44 @@
 package geosite
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"sort"
 	"strings"
 
+	"github.com/snowie2000/geoview/protohelper"
+	"github.com/snowie2000/geoview/strmatcher"
+
 	"github.com/sagernet/sing/common"
 	"github.com/snowie2000/geoview/srs"
 )
 
-func extractV2GeoSite(geositeList []GeoSite, want map[string][]string, regex bool) (list []string, itemlist []Item, err error) {
+var matcherTypeMap = map[Domain_Type]strmatcher.Type{
+	Domain_Plain:  strmatcher.Substr,
+	Domain_Regex:  strmatcher.Regex,
+	Domain_Domain: strmatcher.Domain,
+	Domain_Full:   strmatcher.Full,
+}
+
+func extractV2GeoSite(geositeList []GeoSite, want map[string][]string, regex bool, keyword bool) (list []string, itemlist []Item, err error) {
 	match := false
 	for _, site := range geositeList {
 		if v, ok := want[strings.ToUpper(site.CountryCode)]; !ok {
 			log.Println(site.CountryCode, "not found", v)
 		}
 		if v, ok := want[strings.ToUpper(site.CountryCode)]; ok {
-			domains := processGeositeEntry(&site)
+			domains := v2ItemToSing(site.Domain)
 			for _, it := range domains {
 				switch it.Type {
 				case RuleTypeDomainRegex:
 					if !regex {
+						continue
+					}
+					fallthrough
+				case RuleTypeDomainKeyword:
+					if !keyword {
 						continue
 					}
 					fallthrough
@@ -52,13 +68,18 @@ func extractV2GeoSite(geositeList []GeoSite, want map[string][]string, regex boo
 	return
 }
 
-func extractSingGeoSite(geoReader *GeoSiteReader, codes []string, wantList map[string][]string, regex bool) (list []string, itemlist []Item, err error) {
+func extractSingGeoSite(geoReader *GeoSiteReader, codes []string, wantList map[string][]string, regex bool, keyword bool) (list []string, itemlist []Item, err error) {
 	for code, _ := range wantList {
 		if item, err := geoReader.Read(code); err == nil {
 			for _, it := range item {
 				switch it.Type {
 				case RuleTypeDomainRegex:
 					if !regex {
+						continue
+					}
+					fallthrough
+				case RuleTypeDomainKeyword:
+					if !keyword {
 						continue
 					}
 					fallthrough
@@ -74,6 +95,85 @@ func extractSingGeoSite(geoReader *GeoSiteReader, codes []string, wantList map[s
 	return
 }
 
+func matchSiteAgainstList(domains []*Domain, domain string) (bool, error) {
+	g := strmatcher.NewMphMatcherGroup()
+	for _, d := range domains {
+		matcherType, f := matcherTypeMap[d.Type]
+		if !f {
+			return false, errors.New("unsupported domain type")
+		}
+		_, err := g.AddPattern(d.Value, matcherType)
+		if err != nil {
+			return false, err
+		}
+	}
+	g.Build()
+	return len(g.Match(domain)) > 0, nil
+}
+
+// search for a domain in all geosite sites and return matched site codes
+func Lookup(file string, domain string) ([]string, error) {
+	fileContent, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	matchedList := []string{}
+
+	// try sing-box geosite
+	geoReader, codes, err := LoadSingSite(fileContent)
+	if err == nil && len(codes) > 0 {
+		for _, code := range codes {
+			wantList := map[string][]string{
+				code: []string{},
+			}
+			if _, items, err := extractSingGeoSite(geoReader, []string{code}, wantList, true, true); err == nil {
+				if ok, _ := matchSiteAgainstList(singItemToV2(items), domain); ok {
+					matchedList = append(matchedList, code)
+				}
+			}
+		}
+		return matchedList, nil
+	}
+
+	sitecodes := protohelper.CodeList(fileContent)
+	if len(sitecodes) > 0 {
+		for _, code := range sitecodes {
+			sc := string(code)
+			wantList := map[string][]string{
+				sc: []string{},
+			}
+			if geositeList, err := LoadV2Site(fileContent, wantList); err == nil && len(geositeList) > 0 {
+				if ok, _ := matchSiteAgainstList(geositeList[0].Domain, domain); ok {
+					matchedList = append(matchedList, sc)
+
+					// now try extra matches with attributes
+					groups := make(map[string][]*Domain) // separate into multiple domain groups with each attributes
+					for _, domain := range geositeList[0].Domain {
+						if domain.Attribute != nil && len(domain.Attribute) > 0 {
+							for _, attr := range domain.Attribute {
+								if g, ok := groups[attr.Key]; ok {
+									groups[attr.Key] = append(g, domain)
+								} else {
+									groups[attr.Key] = []*Domain{domain}
+								}
+							}
+						}
+					}
+					// now match against each sub group
+					for attr, g := range groups {
+						if ok, _ := matchSiteAgainstList(g, domain); ok {
+							matchedList = append(matchedList, sc+"@"+attr)
+						}
+					}
+				}
+			}
+		}
+		return matchedList, nil
+	}
+
+	return nil, fmt.Errorf("Not a valid geosite format")
+}
+
 func Extract(file string, wantList map[string][]string, regex bool) ([]string, error) {
 	fileContent, err := os.ReadFile(file)
 	if err != nil {
@@ -83,7 +183,7 @@ func Extract(file string, wantList map[string][]string, regex bool) ([]string, e
 	var geositeList []GeoSite
 	geositeList, err = LoadV2Site(fileContent, wantList)
 	if err == nil {
-		domains, _, err := extractV2GeoSite(geositeList, wantList, regex)
+		domains, _, err := extractV2GeoSite(geositeList, wantList, regex, false)
 		if err == nil {
 			domains = common.Uniq(domains)
 			sort.Strings(domains)
@@ -94,7 +194,7 @@ func Extract(file string, wantList map[string][]string, regex bool) ([]string, e
 	// try sing-box geosite
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
-		domains, _, err := extractSingGeoSite(geoReader, codes, wantList, regex)
+		domains, _, err := extractSingGeoSite(geoReader, codes, wantList, regex, false)
 		if err == nil {
 			domains = common.Uniq(domains)
 			sort.Strings(domains)
@@ -114,7 +214,7 @@ func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.Plai
 	var geositeList []GeoSite
 	geositeList, err = LoadV2Site(fileContent, wantList)
 	if err == nil {
-		_, itemlist, err := extractV2GeoSite(geositeList, wantList, regex)
+		_, itemlist, err := extractV2GeoSite(geositeList, wantList, regex, false)
 		if err == nil {
 			return itemToRuleset(itemlist)
 		}
@@ -124,7 +224,7 @@ func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.Plai
 	// try sing-box geosite
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
-		_, itemlist, err := extractSingGeoSite(geoReader, codes, wantList, regex)
+		_, itemlist, err := extractSingGeoSite(geoReader, codes, wantList, regex, false)
 		if err == nil {
 			return itemToRuleset(itemlist)
 		}
@@ -156,11 +256,31 @@ func itemToRuleset(itemlist []Item) (*srs.PlainRuleSetCompat, error) {
 	return ruleset, nil
 }
 
-func processGeositeEntry(vGeositeEntry *GeoSite) []Item {
-	var domains []Item
-	var item Item
+func singItemToV2(singItem []Item) []*Domain {
+	list := []*Domain{}
+	for _, item := range singItem {
+		d := &Domain{}
+		d.Value = item.Value
+		switch item.Type {
+		case RuleTypeDomain:
+			d.Type = Domain_Full
+		case RuleTypeDomainSuffix:
+			d.Type = Domain_Domain
+		case RuleTypeDomainKeyword:
+			d.Type = Domain_Plain
+		case RuleTypeDomainRegex:
+			d.Type = Domain_Regex
+		}
+		list = append(list, d)
+	}
+	return list
+}
 
-	for _, domain := range vGeositeEntry.Domain {
+func v2ItemToSing(v2Item []*Domain) []Item {
+	var item Item
+	items := []Item{}
+
+	for _, domain := range v2Item {
 		item.Value = domain.Value
 		switch domain.Type {
 		case Domain_Full:
@@ -180,8 +300,8 @@ func processGeositeEntry(vGeositeEntry *GeoSite) []Item {
 			}
 			item.Attr[attr.Key] = struct{}{}
 		}
-		domains = append(domains, item)
+		items = append(items, item)
 	}
 
-	return domains
+	return items
 }

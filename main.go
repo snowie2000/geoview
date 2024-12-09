@@ -21,7 +21,7 @@ var (
 )
 
 const (
-	VERSION string = "0.0.9"
+	VERSION string = "0.1.0"
 )
 
 func main() {
@@ -217,7 +217,14 @@ func lookup() {
 			fmt.Println(code)
 		}
 	case "geosite":
-		printErrorln("Not implemented")
+		ret, err := geosite.Lookup(global.Input, global.Target)
+		if err == nil {
+			for _, code := range ret {
+				fmt.Println(code)
+			}
+		} else {
+			printErrorln("Error:", err)
+		}
 	}
 }
 
