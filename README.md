@@ -2,7 +2,7 @@
 
 Extract information from geoip and geosite files from Project X and Sing-box.
 
-### Usage
+## Usage
 
 ```
 Usage:
@@ -30,7 +30,7 @@ Usage:
         ip or domain to lookup, required only for lookup action
 ```
 
-### Examples
+## Examples
 
 #### Extract IP ranges of China and Japan from geoip.dat
 
@@ -38,19 +38,19 @@ Usage:
 ./geoview -type geoip -input geoip.dat -list cn,jp -output cn_jp.txt
 ```
 
-### Extract domain list of gfw from geosite.dat
+#### Extract domain list of gfw from geosite.dat
 
 ```bash
 ./geoview -type geosite -input geosite.dat -list gfw -output gfw.txt
 ```
 
-### Extract domain list of medium and convert into sing-box ruleset JSON
+#### Extract domain list of medium and convert into sing-box ruleset JSON
 
 ```bash
 ./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.json
 ```
 
-### Extract domain list of medium and convert into sing-box ruleset binary
+#### Extract domain list of medium and convert into sing-box ruleset binary
 ```bash
 ./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.srs
 ```
@@ -65,7 +65,7 @@ Usage:
 
 -------
 
-### Lookup IPs and Domains
+## Lookup IPs and Domains
 
 The `-action lookup` flag will search for your target ip or domain in the geoip or geosite file and output all the list codes that contain the desired IP or domain, including all possible domain attributes (no support for sing-box geosite)
 
@@ -98,7 +98,7 @@ APPLE-UPDATE
 ```
 
 
-### Low memory mode
+## Low memory mode
 By adding `-lowmem` to the command, the program will read the file partially to reduce memory usage. This is useful when execute on devices with limited memory.
 
 ## Compile for OpenWrt
