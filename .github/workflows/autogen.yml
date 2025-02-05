@@ -18,26 +18,18 @@ jobs:
     - name: Create /opt directory if not exists
       run: sudo mkdir -p /opt
 
-    - name: Download geosite.dat
-      run: sudo curl -L -o /opt/geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+    - name: Download assets
+      run: |
+        sudo curl -L -o /opt/geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+        sudo curl -L -o /opt/geoview_linux_amd64 https://github.com/snowie2000/geoview/releases/latest/download/geoview_linux_amd64
+        sudo chmod +x /opt/geoview_linux_amd64
 
-    - name: Download geoview executable
-      run: sudo curl -L -o /opt/geoview_linux_amd64 https://github.com/snowie2000/geoview/releases/latest/download/geoview_linux_amd64
-
-    - name: Make geoview executable
-      run: sudo chmod +x /opt/geoview_linux_amd64
-
-    - name: Run geoview command for gfw.conf
-      run: /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list gfw -type geosite -format qx -output /home/runner/work/geoview/geoview/gfw.conf
-
-    - name: Run geoview command for global.conf
-      run: /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'geolocation-!cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/global.conf
-
-    - name: Run geoview command for cn.conf
-      run: /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/cn.conf
-
-    - name: Run geoview command for ads.conf
-      run: /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'category-ads' -type geosite -format qx -output /home/runner/work/geoview/geoview/ads.conf
+    - name: Generate rules
+      run: |
+        /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list gfw -type geosite -format qx -output /home/runner/work/geoview/geoview/gfw.conf
+        /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'geolocation-!cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/global.conf
+        /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/cn.conf
+        /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'category-ads' -type geosite -format qx -output /home/runner/work/geoview/geoview/ads.conf
 
     - name: Commit and push changes
       run: |
