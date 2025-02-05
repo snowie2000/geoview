@@ -31,7 +31,20 @@ jobs:
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/cn.conf
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'category-ads' -type geosite -format qx -output /home/runner/work/geoview/geoview/ads.conf
 
+    - name: Check for changes
+      id: changes
+      run: |
+        git add gfw.conf global.conf ads.conf cn.conf
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+          echo "changed=false" >> $GITHUB_ENV
+        else
+          echo "Changes detected"
+          echo "changed=true" >> $GITHUB_ENV
+        fi
+        
     - name: Commit and push changes
+      if: env.changed == 'true'
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
