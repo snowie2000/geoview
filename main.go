@@ -21,7 +21,7 @@ var (
 )
 
 const (
-	VERSION string = "0.1.0"
+	VERSION string = "0.1.1"
 )
 
 func main() {
@@ -35,6 +35,7 @@ func main() {
 	myflag.BoolVar(&global.Regex, "regex", false, "allow regex rules in the geosite result")
 	myflag.StringVar(&global.Output, "output", "", "output to file, leave empty to print to console")
 	myflag.StringVar(&global.Target, "value", "", "ip or domain to lookup, required only for lookup action")
+	myflag.StringVar(&global.Format, "format", "ruleset", "convert output format. type: ruleset(srs) | quantumultx(qx)")
 	myflag.BoolVar(&global.Appendfile, "append", false, "append to existing file instead of overwriting")
 	myflag.BoolVar(&global.Lowmem, "lowmem", false, "low memory mode, reduce memory cost by partial file reading")
 	myflag.BoolVar(&version, "version", false, "print version")
@@ -186,22 +187,44 @@ func convert() {
 			parts := strings.Split(strings.ToLower(v), "@") // attributes are lowercased
 			wantMap[strings.ToUpper(parts[0])] = parts[1:]
 		}
-		ret, err := geosite.ToRuleSet(global.Input, wantMap, global.Regex)
-		if err == nil {
-			if global.Output != "" { // output to file
-				err = outputRulesetToFile(global.Output, ret)
-				if err != nil {
-					printErrorln("Error:", err)
+		// convert to the target format according to the format arg
+		switch global.Format {
+		case "srs":
+			fallthrough
+		case "ruleset":
+			ret, err := geosite.ToRuleSet(global.Input, wantMap, global.Regex)
+			if err == nil {
+				if global.Output != "" { // output to file
+					err = outputRulesetToFile(global.Output, ret)
+					if err != nil {
+						printErrorln("Error:", err)
+					}
+					return
 				}
-				return
+				// output json to stdout
+				stdjson := json.NewEncoder(os.Stdout)
+				if err = stdjson.Encode(*ret); err != nil {
+					printErrorln("Error:", err, ret)
+				}
+			} else {
+				printErrorln("Error:", err)
 			}
-			// output json to stdout
-			stdjson := json.NewEncoder(os.Stdout)
-			if err = stdjson.Encode(*ret); err != nil {
-				printErrorln("Error:", err, ret)
+
+		case "qx":
+			fallthrough
+		case "quantumultx":
+			ret, err := geosite.ToQuantumultX(global.Input, wantMap)
+			if err == nil {
+				if global.Output != "" {
+					outputToFile(global.Output, ret, global.Appendfile)
+				} else {
+					for _, v := range ret {
+						fmt.Println(v)
+					}
+				}
+			} else {
+				printErrorln("Error:", err)
 			}
-		} else {
-			printErrorln("Error:", err)
 		}
 	}
 }
@@ -256,7 +279,7 @@ func outputRulesetToFile(fileName string, ruleset *srs.PlainRuleSetCompat) error
 			return err
 		}
 		defer file.Close()
-		return srs.Write(file, ruleset.Options, ruleset.Version != 1)
+		return srs.Write(file, ruleset.Options, ruleset.Version)
 	}
 }
 

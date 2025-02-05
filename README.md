@@ -10,6 +10,8 @@ Usage:
         action: extract | convert | lookup (default "extract")
   -append
         append to existing file instead of overwriting
+  -format string
+        convert output format. type: ruleset(srs) | quantumultx(qx) (default "ruleset")
   -input string
         datafile
   -ipv4
@@ -43,25 +45,6 @@ Usage:
 ```bash
 ./geoview -type geosite -input geosite.dat -list gfw -output gfw.txt
 ```
-
-#### Extract domain list of medium and convert into sing-box ruleset JSON
-
-```bash
-./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.json
-```
-
-#### Extract domain list of medium and convert into sing-box ruleset binary
-```bash
-./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.srs
-```
-
-* Regex rules of geosite are ignored by default.
-
-* When using `-append=true` to ruleset and the output format is JSON, existing rules will be kept and new rules will be appended.
-
-* When converting geo files to ruleset, the output format is determined by file extensions. Without specifying the output file extension, the output format is always JSON.
-
-* Binary ruleset conversion doesn't support appending, it always creates a new file.
 
 -------
 
@@ -97,6 +80,38 @@ GEOLOCATION-!CN
 APPLE-UPDATE
 ```
 
+## Convert into other formats
+There are currently two formats supported: 
+- srs ruleset for singbox (*default)
+- filter for QuantumultX
+
+Format can be set by `-format` flag. abbr. is also accepted, such as `qx` for `quantumultx`
+
+#### Extract domain list of medium and convert into sing-box ruleset JSON
+
+```bash
+./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.json
+```
+
+#### Extract domain list of medium and convert into sing-box ruleset binary
+```bash
+./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.srs
+```
+
+#### Extract domain list of medium and convert into QuantumultX filter set
+```bash
+./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.conf -format qx
+```
+
+* Regex rules of geosite are ignored by default.
+
+* When using `-append=true` to ruleset and the output format is JSON, existing rules will be kept and new rules will be appended.
+
+* When converting geo files to ruleset, the output format is determined by file extensions. Without specifying the output file extension, the output format is always JSON.
+
+* Binary ruleset conversion doesn't support appending, it always creates a new file.
+
+* Geoip to QuantumultX filter is not implemented yet.
 
 ## Low memory mode
 By adding `-lowmem` to the command, the program will read the file partially to reduce memory usage. This is useful when execute on devices with limited memory.

@@ -126,7 +126,7 @@ func (g *GeoIPDatIn) ToRuleSet(ipType IPType) (*srs.PlainRuleSetCompat, error) {
 	}
 
 	ruleset := &srs.PlainRuleSetCompat{
-		Version: srs.RuleSetVersion1,
+		Version: srs.RuleSetVersionCurrent,
 	}
 	rule := srs.HeadlessRule{
 		Type: srs.RuleTypeDefault,

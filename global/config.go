@@ -10,6 +10,7 @@ var (
 	Regex      bool
 	Output     string
 	Target     string
+	Format     string
 	Appendfile bool
 	Lowmem     bool
 )

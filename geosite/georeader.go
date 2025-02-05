@@ -70,7 +70,8 @@ func extractV2GeoSite(geositeList []GeoSite, want map[string][]string, regex boo
 
 func extractSingGeoSite(geoReader *GeoSiteReader, codes []string, wantList map[string][]string, regex bool, keyword bool) (list []string, itemlist []Item, err error) {
 	for code, _ := range wantList {
-		if item, err := geoReader.Read(code); err == nil {
+		// singbox rulec codes are always lowercased
+		if item, err := geoReader.Read(strings.ToLower(code)); err == nil {
 			for _, it := range item {
 				switch it.Type {
 				case RuleTypeDomainRegex:
@@ -84,8 +85,13 @@ func extractSingGeoSite(geoReader *GeoSiteReader, codes []string, wantList map[s
 					}
 					fallthrough
 				case RuleTypeDomain:
-					fallthrough
+					list = append(list, it.Value)
+					itemlist = append(itemlist, it)
 				case RuleTypeDomainSuffix:
+					// remove "." prefix for singbox rules
+					if len(it.Value) > 0 && it.Value[0] == '.' {
+						it.Value = it.Value[1:]
+					}
 					list = append(list, it.Value)
 					itemlist = append(itemlist, it)
 				}
@@ -181,16 +187,6 @@ func Extract(file string, wantList map[string][]string, regex bool) ([]string, e
 	}
 
 	var geositeList []GeoSite
-	geositeList, err = LoadV2Site(fileContent, wantList)
-	if err == nil {
-		domains, _, err := extractV2GeoSite(geositeList, wantList, regex, false)
-		if err == nil {
-			domains = common.Uniq(domains)
-			sort.Strings(domains)
-		}
-		return domains, err
-	}
-
 	// try sing-box geosite
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
@@ -201,6 +197,17 @@ func Extract(file string, wantList map[string][]string, regex bool) ([]string, e
 		}
 		return domains, err
 	}
+
+	geositeList, err = LoadV2Site(fileContent, wantList)
+	if err == nil {
+		domains, _, err := extractV2GeoSite(geositeList, wantList, regex, false)
+		if err == nil {
+			domains = common.Uniq(domains)
+			sort.Strings(domains)
+		}
+		return domains, err
+	}
+
 	return nil, fmt.Errorf("Not a valid geosite format")
 }
 
@@ -212,15 +219,6 @@ func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.Plai
 	}
 
 	var geositeList []GeoSite
-	geositeList, err = LoadV2Site(fileContent, wantList)
-	if err == nil {
-		_, itemlist, err := extractV2GeoSite(geositeList, wantList, regex, false)
-		if err == nil {
-			return itemToRuleset(itemlist)
-		}
-		return nil, err
-	}
-
 	// try sing-box geosite
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
@@ -230,12 +228,69 @@ func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.Plai
 		}
 		return nil, err
 	}
+
+	geositeList, err = LoadV2Site(fileContent, wantList)
+	if err == nil {
+		_, itemlist, err := extractV2GeoSite(geositeList, wantList, regex, false)
+		if err == nil {
+			return itemToRuleset(itemlist)
+		}
+		return nil, err
+	}
 	return nil, fmt.Errorf("Not a valid geosite format")
+}
+
+func ToQuantumultX(file string, wantList map[string][]string) ([]string, error) {
+	fileContent, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	var geositeList []GeoSite
+	// try sing-box geosite
+	geoReader, codes, err := LoadSingSite(fileContent)
+	if err == nil && len(codes) > 0 {
+		_, itemlist, err := extractSingGeoSite(geoReader, codes, wantList, false, false)
+		if err == nil {
+			return itemToQxRule(itemlist)
+		}
+		return nil, err
+	}
+
+	geositeList, err = LoadV2Site(fileContent, wantList)
+	if err == nil {
+		_, itemlist, err := extractV2GeoSite(geositeList, wantList, false, true)
+		if err == nil {
+			return itemToQxRule(itemlist)
+		}
+		return nil, err
+	}
+	return nil, fmt.Errorf("Not a valid geosite format")
+}
+
+func itemToQxRule(itemlist []Item) ([]string, error) {
+	list := []string{}
+	for _, it := range itemlist {
+		switch it.Type {
+		case RuleTypeDomain:
+			{
+				list = append(list, fmt.Sprintf("host,%s,Proxy", it.Value))
+			}
+		case RuleTypeDomainSuffix:
+			{
+				list = append(list, fmt.Sprintf("host-suffix,%s,Proxy", it.Value))
+			}
+		case RuleTypeDomainKeyword:
+			{
+				list = append(list, fmt.Sprintf("host-keyword,%s,Proxy", it.Value))
+			}
+		}
+	}
+	return list, nil
 }
 
 func itemToRuleset(itemlist []Item) (*srs.PlainRuleSetCompat, error) {
 	ruleset := &srs.PlainRuleSetCompat{
-		Version: srs.RuleSetVersion1,
+		Version: srs.RuleSetVersionCurrent,
 	}
 	rule := srs.HeadlessRule{
 		Type: srs.RuleTypeDefault,
@@ -249,7 +304,13 @@ func itemToRuleset(itemlist []Item) (*srs.PlainRuleSetCompat, error) {
 		case RuleTypeDomainRegex:
 			rule.DefaultOptions.DomainRegex = append(rule.DefaultOptions.DomainRegex, it.Value)
 		case RuleTypeDomainSuffix:
-			rule.DefaultOptions.DomainSuffix = append(rule.DefaultOptions.DomainSuffix, it.Value)
+			// domain suffix must start with "."
+			// since we have unified all extracted results during the extraction stage, we need to add it back here.
+			domain := it.Value
+			if domain[0] != '.' {
+				domain = "." + domain
+			}
+			rule.DefaultOptions.DomainSuffix = append(rule.DefaultOptions.DomainSuffix, domain)
 		}
 	}
 	ruleset.Options.Rules = []srs.HeadlessRule{rule}

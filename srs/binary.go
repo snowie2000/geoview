@@ -1,3 +1,4 @@
+// source: common/srs/binary.go
 package srs
 
 import (
@@ -36,10 +37,13 @@ const (
 	ruleItemWIFIBSSID
 	ruleItemAdGuardDomain
 	ruleItemProcessPathRegex
+	ruleItemNetworkType
+	ruleItemNetworkIsExpensive
+	ruleItemNetworkIsConstrained
 	ruleItemFinal uint8 = 0xFF
 )
 
-func Read(reader io.Reader, recover bool) (ruleSet PlainRuleSet, err error) {
+func Read(reader io.Reader, recover bool) (ruleSetCompat PlainRuleSetCompat, err error) {
 	var magicBytes [3]byte
 	_, err = io.ReadFull(reader, magicBytes[:])
 	if err != nil {
@@ -52,10 +56,10 @@ func Read(reader io.Reader, recover bool) (ruleSet PlainRuleSet, err error) {
 	var version uint8
 	err = binary.Read(reader, binary.BigEndian, &version)
 	if err != nil {
-		return ruleSet, err
+		return ruleSetCompat, err
 	}
-	if version > RuleSetVersion2 {
-		return ruleSet, E.New("unsupported version: ", version)
+	if version > RuleSetVersionCurrent {
+		return ruleSetCompat, E.New("unsupported version: ", version)
 	}
 	compressReader, err := zlib.NewReader(reader)
 	if err != nil {
@@ -66,9 +70,10 @@ func Read(reader io.Reader, recover bool) (ruleSet PlainRuleSet, err error) {
 	if err != nil {
 		return
 	}
-	ruleSet.Rules = make([]HeadlessRule, length)
+	ruleSetCompat.Version = version
+	ruleSetCompat.Options.Rules = make([]HeadlessRule, length)
 	for i := uint64(0); i < length; i++ {
-		ruleSet.Rules[i], err = readRule(bReader, recover)
+		ruleSetCompat.Options.Rules[i], err = readRule(bReader, recover)
 		if err != nil {
 			err = E.Cause(err, "read rule[", i, "]")
 			return
@@ -77,18 +82,12 @@ func Read(reader io.Reader, recover bool) (ruleSet PlainRuleSet, err error) {
 	return
 }
 
-func Write(writer io.Writer, ruleSet PlainRuleSet, generateUnstable bool) error {
+func Write(writer io.Writer, ruleSet PlainRuleSet, generateVersion uint8) error {
 	_, err := writer.Write(MagicBytes[:])
 	if err != nil {
 		return err
 	}
-	var version uint8
-	if generateUnstable {
-		version = RuleSetVersion2
-	} else {
-		version = RuleSetVersion1
-	}
-	err = binary.Write(writer, binary.BigEndian, version)
+	err = binary.Write(writer, binary.BigEndian, generateVersion)
 	if err != nil {
 		return err
 	}
@@ -102,7 +101,7 @@ func Write(writer io.Writer, ruleSet PlainRuleSet, generateUnstable bool) error 
 		return err
 	}
 	for _, rule := range ruleSet.Rules {
-		err = writeRule(bWriter, rule, generateUnstable)
+		err = writeRule(bWriter, rule, generateVersion)
 		if err != nil {
 			return err
 		}
@@ -133,12 +132,12 @@ func readRule(reader varbin.Reader, recover bool) (rule HeadlessRule, err error)
 	return
 }
 
-func writeRule(writer varbin.Writer, rule HeadlessRule, generateUnstable bool) error {
+func writeRule(writer varbin.Writer, rule HeadlessRule, generateVersion uint8) error {
 	switch rule.Type {
 	case RuleTypeDefault:
-		return writeDefaultRule(writer, rule.DefaultOptions, generateUnstable)
+		return writeDefaultRule(writer, rule.DefaultOptions, generateVersion)
 	case RuleTypeLogical:
-		return writeLogicalRule(writer, rule.LogicalOptions, generateUnstable)
+		return writeLogicalRule(writer, rule.LogicalOptions, generateVersion)
 	default:
 		panic("unknown rule type: " + rule.Type)
 	}
@@ -225,6 +224,12 @@ func readDefaultRule(reader varbin.Reader, recover bool) (rule DefaultHeadlessRu
 				return
 			}
 			rule.AdGuardDomainMatcher = matcher
+		case ruleItemNetworkType:
+			rule.NetworkType, err = readRuleItemUint8[InterfaceType](reader)
+		case ruleItemNetworkIsExpensive:
+			rule.NetworkIsExpensive = true
+		case ruleItemNetworkIsConstrained:
+			rule.NetworkIsConstrained = true
 		case ruleItemFinal:
 			err = binary.Read(reader, binary.BigEndian, &rule.Invert)
 			return
@@ -238,7 +243,7 @@ func readDefaultRule(reader varbin.Reader, recover bool) (rule DefaultHeadlessRu
 	}
 }
 
-func writeDefaultRule(writer varbin.Writer, rule DefaultHeadlessRule, generateUnstable bool) error {
+func writeDefaultRule(writer varbin.Writer, rule DefaultHeadlessRule, generateVersion uint8) error {
 	err := binary.Write(writer, binary.BigEndian, uint8(0))
 	if err != nil {
 		return err
@@ -262,7 +267,7 @@ func writeDefaultRule(writer varbin.Writer, rule DefaultHeadlessRule, generateUn
 		if err != nil {
 			return err
 		}
-		err = domain.NewMatcher(rule.Domain, rule.DomainSuffix, !generateUnstable).Write(writer)
+		err = domain.NewMatcher(rule.Domain, rule.DomainSuffix, generateVersion == RuleSetVersion1).Write(writer)
 		if err != nil {
 			return err
 		}
@@ -339,6 +344,27 @@ func writeDefaultRule(writer varbin.Writer, rule DefaultHeadlessRule, generateUn
 			return err
 		}
 	}
+	if len(rule.NetworkType) > 0 {
+		if generateVersion < RuleSetVersion3 {
+			return E.New("network_type rule item is only supported in version 3 or later")
+		}
+		err = writeRuleItemUint8(writer, ruleItemNetworkType, rule.NetworkType)
+		if err != nil {
+			return err
+		}
+	}
+	if rule.NetworkIsExpensive {
+		err = binary.Write(writer, binary.BigEndian, ruleItemNetworkIsExpensive)
+		if err != nil {
+			return err
+		}
+	}
+	if rule.NetworkIsConstrained {
+		err = binary.Write(writer, binary.BigEndian, ruleItemNetworkIsConstrained)
+		if err != nil {
+			return err
+		}
+	}
 	if len(rule.WIFISSID) > 0 {
 		err = writeRuleItemString(writer, ruleItemWIFISSID, rule.WIFISSID)
 		if err != nil {
@@ -352,6 +378,9 @@ func writeDefaultRule(writer varbin.Writer, rule DefaultHeadlessRule, generateUn
 		}
 	}
 	if len(rule.AdGuardDomain) > 0 {
+		if generateVersion < RuleSetVersion2 {
+			return E.New("AdGuard rule items is only supported in version 2 or later")
+		}
 		err = binary.Write(writer, binary.BigEndian, ruleItemAdGuardDomain)
 		if err != nil {
 			return err
@@ -377,6 +406,18 @@ func readRuleItemString(reader varbin.Reader) ([]string, error) {
 }
 
 func writeRuleItemString(writer varbin.Writer, itemType uint8, value []string) error {
+	err := writer.WriteByte(itemType)
+	if err != nil {
+		return err
+	}
+	return varbin.Write(writer, binary.BigEndian, value)
+}
+
+func readRuleItemUint8[E ~uint8](reader varbin.Reader) ([]E, error) {
+	return varbin.ReadValue[[]E](reader, binary.BigEndian)
+}
+
+func writeRuleItemUint8[E ~uint8](writer varbin.Writer, itemType uint8, value []E) error {
 	err := writer.WriteByte(itemType)
 	if err != nil {
 		return err
@@ -455,7 +496,7 @@ func readLogicalRule(reader varbin.Reader, recovery bool) (logicalRule LogicalHe
 	return
 }
 
-func writeLogicalRule(writer varbin.Writer, logicalRule LogicalHeadlessRule, generateUnstable bool) error {
+func writeLogicalRule(writer varbin.Writer, logicalRule LogicalHeadlessRule, generateVersion uint8) error {
 	err := binary.Write(writer, binary.BigEndian, uint8(1))
 	if err != nil {
 		return err
@@ -476,7 +517,7 @@ func writeLogicalRule(writer varbin.Writer, logicalRule LogicalHeadlessRule, gen
 		return err
 	}
 	for _, rule := range logicalRule.Rules {
-		err = writeRule(writer, rule, generateUnstable)
+		err = writeRule(writer, rule, generateVersion)
 		if err != nil {
 			return err
 		}
