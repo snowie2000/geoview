@@ -11,7 +11,7 @@ Usage:
   -append
         append to existing file instead of overwriting
   -format string
-        convert output format. type: ruleset(srs) | quantumultx(qx) (default "ruleset")
+        convert output format. type: ruleset(srs) | quantumultx(qx) (default "ruleset") | json
   -input string
         datafile
   -ipv4
@@ -107,11 +107,9 @@ Format can be set by `-format` flag. abbr. is also accepted, such as `qx` for `q
 
 * When using `-append=true` to ruleset and the output format is JSON, existing rules will be kept and new rules will be appended.
 
-* When converting geo files to ruleset, the output format is determined by file extensions. Without specifying the output file extension, the output format is always JSON.
+* When converting geo files to ruleset, the output format is determined by `-format` flag. The format is always `JSON` if `output` is not specified for ruleset conversion.
 
 * Binary ruleset conversion doesn't support appending, it always creates a new file.
-
-* Geoip to QuantumultX filter is not implemented yet.
 
 ## Low memory mode
 By adding `-lowmem` to the command, the program will read the file partially to reduce memory usage. This is useful when execute on devices with limited memory.

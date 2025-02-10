@@ -100,22 +100,6 @@ func (g *GeoIPDatIn) Extract(ipType IPType) (list []string, err error) {
 			list = append(list, t...)
 		}
 	}
-
-	/*
-		var ranges []cidr.IRange
-		for _, v := range list {
-			if r, err := cidr.ParseRange(v); err == nil {
-				ranges = append(ranges, r)
-			}
-		}
-		ranges = cidr.SortAndMerge(ranges)
-		list = nil
-		for _, r := range ranges {
-			for _, n := range r.ToIpNets() {
-				list = append(list, n.String())
-			}
-		}
-	*/
 	return
 }
 
@@ -134,6 +118,57 @@ func (g *GeoIPDatIn) ToRuleSet(ipType IPType) (*srs.PlainRuleSetCompat, error) {
 	rule.DefaultOptions.IPCIDR = cidrlist
 	ruleset.Options.Rules = []srs.HeadlessRule{rule}
 	return ruleset, nil
+}
+
+func (g *GeoIPDatIn) ToQuantumultX(ipType IPType) ([]string, error) {
+	// extract ip rules from the database
+	entries := make(map[string]*Entry)
+	err := g.parseFile(g.URI, entries)
+	if err != nil {
+		return nil, err
+	}
+
+	var ignoreIPType IPIgnoreType = ""
+	if ipType&IPv4 == 0 {
+		ignoreIPType = IgIPv4
+	}
+	if ipType&IPv6 == 0 {
+		ignoreIPType = IgIPv6
+	}
+	// separate ips into two lists
+	var list4 []string
+	var list6 []string
+	var it4 IgnoreIPOption = IgnoreIPv4
+	for _, entry := range entries {
+		if t, err := entry.MarshalText(it4); err == nil && t != nil {
+			list6 = append(list6, t...)
+		}
+	}
+	var it6 IgnoreIPOption = IgnoreIPv6
+	for _, entry := range entries {
+		if t, err := entry.MarshalText(it6); err == nil && t != nil {
+			list4 = append(list4, t...)
+		}
+	}
+	// now convert ip-cidr into qx filter format
+	for i, cidr := range list4 {
+		list4[i] = fmt.Sprintf("ip-cidr, %s, Proxy", cidr)
+	}
+	for i, cidr := range list6 {
+		list6[i] = fmt.Sprintf("ip6-cidr, %s, Proxy", cidr)
+	}
+	// return request lists
+	switch ignoreIPType {
+	case IgIPv4:
+		// only output ipv6 results
+		return list6, nil
+	case IgIPv6:
+		// only output ipv4 results;
+		return list4, nil
+	default:
+		// output both
+		return append(list4, list6...), nil
+	}
 }
 
 func (g *GeoIPDatIn) parseFile(path string, entries map[string]*Entry) error {

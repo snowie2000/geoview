@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/snowie2000/geoview/protohelper"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/snowie2000/geoview/geoip"
@@ -21,7 +21,7 @@ var (
 )
 
 const (
-	VERSION string = "0.1.1"
+	VERSION string = "0.1.2"
 )
 
 func main() {
@@ -35,7 +35,7 @@ func main() {
 	myflag.BoolVar(&global.Regex, "regex", false, "allow regex rules in the geosite result")
 	myflag.StringVar(&global.Output, "output", "", "output to file, leave empty to print to console")
 	myflag.StringVar(&global.Target, "value", "", "ip or domain to lookup, required only for lookup action")
-	myflag.StringVar(&global.Format, "format", "ruleset", "convert output format. type: ruleset(srs) | quantumultx(qx)")
+	myflag.StringVar(&global.Format, "format", "ruleset", "convert output format. type: ruleset(srs) | quantumultx(qx) | json")
 	myflag.BoolVar(&global.Appendfile, "append", false, "append to existing file instead of overwriting")
 	myflag.BoolVar(&global.Lowmem, "lowmem", false, "low memory mode, reduce memory cost by partial file reading")
 	myflag.BoolVar(&version, "version", false, "print version")
@@ -57,11 +57,10 @@ func main() {
 	switch global.Action {
 	case "extract":
 		if global.Want == "" {
-			printErrorln("Error: List should not be empty\n")
-			myflag.Usage()
-			return
+			listCodes()
+		} else {
+			extract()
 		}
-		extract()
 	case "convert":
 		if global.Want == "" {
 			printErrorln("Error: List should not be empty\n")
@@ -78,6 +77,46 @@ func main() {
 		lookup()
 	default:
 		printErrorln("Error: unknown action:", global.Action)
+	}
+}
+
+// list all stored codes in the database
+func listCodes() {
+	switch global.Datatype {
+	case "geoip":
+		file, err := os.Open(global.Input)
+		if err != nil {
+			printErrorln("Can't open input file")
+			return
+		}
+		defer file.Close()
+		list := protohelper.CodeListByReader(file)
+		fmt.Println("Available codes:")
+		for _, code := range list {
+			fmt.Println(string(code))
+		}
+
+	case "geosite":
+		fileContent, err := os.ReadFile(global.Input)
+		if err != nil {
+			printErrorln("Can't open input file")
+			return
+		}
+		// load as sing-box db
+		if _, codes, err := geosite.LoadSingSite(fileContent); err == nil {
+			fmt.Println("Available codes:")
+			for _, code := range codes {
+				fmt.Println(string(code))
+			}
+			return
+		}
+		// load as v2ray db
+		codes := protohelper.CodeList(fileContent)
+		fmt.Println("Available codes:")
+		for _, code := range codes {
+			fmt.Println(string(code))
+		}
+		return
 	}
 }
 
@@ -161,41 +200,17 @@ func convert() {
 		if global.Ipv6 {
 			tp |= geoip.IPv6
 		}
-		ret, err := data.ToRuleSet(tp)
-		if err == nil {
-			if global.Output != "" { // output to file
-				err = outputRulesetToFile(global.Output, ret)
-				if err != nil {
-					printErrorln("Error:", err)
-				}
-				return
-			}
-			// output json to stdout
-			stdjson := json.NewEncoder(os.Stdout)
-			if err = stdjson.Encode(*ret); err != nil {
-				printErrorln("Error:", err, ret)
-			}
-		} else {
-			printErrorln("Error:", err)
-		}
-		return
-
-	case "geosite":
-		list := strings.Split(global.Want, ",")
-		wantMap := make(map[string][]string)
-		for _, v := range list {
-			parts := strings.Split(strings.ToLower(v), "@") // attributes are lowercased
-			wantMap[strings.ToUpper(parts[0])] = parts[1:]
-		}
 		// convert to the target format according to the format arg
 		switch global.Format {
+		case "json": // ruleset json
+			fallthrough
 		case "srs":
 			fallthrough
-		case "ruleset":
-			ret, err := geosite.ToRuleSet(global.Input, wantMap, global.Regex)
+		case "ruleset": //ruleset binary
+			ret, err := data.ToRuleSet(tp)
 			if err == nil {
 				if global.Output != "" { // output to file
-					err = outputRulesetToFile(global.Output, ret)
+					err = outputRulesetToFile(global.Output, ret, global.Format)
 					if err != nil {
 						printErrorln("Error:", err)
 					}
@@ -209,7 +224,55 @@ func convert() {
 			} else {
 				printErrorln("Error:", err)
 			}
+		case "qx":
+			fallthrough
+		case "quantumultx":
+			ret, err := data.ToQuantumultX(tp)
+			if err == nil {
+				if global.Output != "" {
+					outputToFile(global.Output, ret, global.Appendfile)
+				} else {
+					for _, v := range ret {
+						fmt.Println(v)
+					}
+				}
+			} else {
+				printErrorln("Error:", err)
+			}
+		}
+		return
 
+	case "geosite":
+		list := strings.Split(global.Want, ",")
+		wantMap := make(map[string][]string)
+		for _, v := range list {
+			parts := strings.Split(strings.ToLower(v), "@") // attributes are lowercased
+			wantMap[strings.ToUpper(parts[0])] = parts[1:]
+		}
+		// convert to the target format according to the format arg
+		switch global.Format {
+		case "json": // ruleset json
+			fallthrough
+		case "srs":
+			fallthrough
+		case "ruleset": //ruleset binary
+			ret, err := geosite.ToRuleSet(global.Input, wantMap, global.Regex)
+			if err == nil {
+				if global.Output != "" { // output to file
+					err = outputRulesetToFile(global.Output, ret, global.Format)
+					if err != nil {
+						printErrorln("Error:", err)
+					}
+					return
+				}
+				// output json to stdout
+				stdjson := json.NewEncoder(os.Stdout)
+				if err = stdjson.Encode(*ret); err != nil {
+					printErrorln("Error:", err, ret)
+				}
+			} else {
+				printErrorln("Error:", err)
+			}
 		case "qx":
 			fallthrough
 		case "quantumultx":
@@ -251,8 +314,8 @@ func lookup() {
 	}
 }
 
-func outputRulesetToFile(fileName string, ruleset *srs.PlainRuleSetCompat) error {
-	if strings.EqualFold(filepath.Ext(fileName), ".json") {
+func outputRulesetToFile(fileName string, ruleset *srs.PlainRuleSetCompat, format string) error {
+	if strings.EqualFold(format, "json") {
 		//output json
 		if global.Appendfile {
 			// incremental json generation
