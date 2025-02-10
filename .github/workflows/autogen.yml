@@ -28,9 +28,9 @@ jobs:
     - name: Generate rules
       run: |
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list gfw -type geosite -format qx -output /home/runner/work/geoview/geoview/gfw.conf
-        /opt/geoview_linux_amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -type geosite -format qx -output /home/runner/work/geoview/geoview/gfw.conf
+        /opt/geoview_linux_amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -format qx -output /home/runner/work/geoview/geoview/gfw.conf
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'geolocation-!cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/global.conf
-        /opt/geoview_linux_amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -type geosite -format qx -output /home/runner/work/geoview/geoview/global.conf
+        /opt/geoview_linux_amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -format qx -output /home/runner/work/geoview/geoview/global.conf
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/cn.conf
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'category-ads' -type geosite -format qx -output /home/runner/work/geoview/geoview/ads.conf
 
