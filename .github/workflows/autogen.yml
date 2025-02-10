@@ -6,7 +6,7 @@ on:
     - cron: '0 0 */3 * *'  # Runs every 3 days at midnight UTC
 
 jobs:
-  download_and_run:
+  generate_qx_rules:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,13 +21,16 @@ jobs:
     - name: Download assets
       run: |
         sudo curl -L -o /opt/geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+        sudo curl -L -o /opt/geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
         sudo curl -L -o /opt/geoview_linux_amd64 https://github.com/snowie2000/geoview/releases/latest/download/geoview_linux_amd64
         sudo chmod +x /opt/geoview_linux_amd64
 
     - name: Generate rules
       run: |
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list gfw -type geosite -format qx -output /home/runner/work/geoview/geoview/gfw.conf
+        /opt/geoview_linux_amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -type geosite -format qx -output /home/runner/work/geoview/geoview/gfw.conf
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'geolocation-!cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/global.conf
+        /opt/geoview_linux_amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -type geosite -format qx -output /home/runner/work/geoview/geoview/global.conf
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/cn.conf
         /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'category-ads' -type geosite -format qx -output /home/runner/work/geoview/geoview/ads.conf
 
