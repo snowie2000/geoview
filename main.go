@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/snowie2000/geoview/protohelper"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"os"
 	"strings"
@@ -21,7 +22,7 @@ var (
 )
 
 const (
-	VERSION string = "0.1.2"
+	VERSION string = "0.1.3"
 )
 
 func main() {
@@ -35,7 +36,7 @@ func main() {
 	myflag.BoolVar(&global.Regex, "regex", false, "allow regex rules in the geosite result")
 	myflag.StringVar(&global.Output, "output", "", "output to file, leave empty to print to console")
 	myflag.StringVar(&global.Target, "value", "", "ip or domain to lookup, required only for lookup action")
-	myflag.StringVar(&global.Format, "format", "ruleset", "convert output format. type: ruleset(srs) | quantumultx(qx) | json")
+	myflag.StringVar(&global.Format, "format", "ruleset", "convert output format. type: ruleset(srs) | quantumultx(qx) | json | geosite")
 	myflag.BoolVar(&global.Appendfile, "append", false, "append to existing file instead of overwriting")
 	myflag.BoolVar(&global.Lowmem, "lowmem", false, "low memory mode, reduce memory cost by partial file reading")
 	myflag.BoolVar(&version, "version", false, "print version")
@@ -239,6 +240,8 @@ func convert() {
 			} else {
 				printErrorln("Error:", err)
 			}
+		default:
+			printErrorln("Error: convert from", global.Datatype, "to format", global.Format, "is not supported")
 		}
 		return
 
@@ -273,6 +276,23 @@ func convert() {
 			} else {
 				printErrorln("Error:", err)
 			}
+		case "geosite":
+			if global.Output == "" {
+				printErrorln("Error: Output file for geosite conversion is required")
+				return
+			}
+			ret, err := geosite.ToGeosite(global.Input, wantMap)
+			if err == nil {
+				protoBytes, err := proto.Marshal(ret)
+				if err == nil {
+					err = os.WriteFile(global.Output, protoBytes, 0644)
+				}
+				if err != nil {
+					printErrorln("Error:", err)
+				}
+			} else {
+				printErrorln("Error:", err)
+			}
 		case "qx":
 			fallthrough
 		case "quantumultx":
@@ -288,6 +308,8 @@ func convert() {
 			} else {
 				printErrorln("Error:", err)
 			}
+		default:
+			printErrorln("Error: convert from", global.Datatype, "to format", global.Format, "is not supported")
 		}
 	}
 }

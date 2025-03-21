@@ -211,6 +211,52 @@ func Extract(file string, wantList map[string][]string, regex bool) ([]string, e
 	return nil, fmt.Errorf("Not a valid geosite format")
 }
 
+func ToGeosite(file string, wantList map[string][]string) (*GeoSiteList, error) {
+	fileContent, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	geolist := new(GeoSiteList)
+	// sing-box geosite
+	geoReader, codes, err := LoadSingSite(fileContent)
+	if err == nil && len(codes) > 0 {
+		for _, code := range codes {
+			if _, ok := wantList[strings.ToUpper(code)]; !ok {
+				continue // skip unwanted codes
+			}
+			tmpList := make(map[string][]string)
+			tmpList[code] = nil // the value never gets read
+			_, itemlist, err := extractSingGeoSite(geoReader, codes, tmpList, true, true)
+			if err == nil {
+				// convert Item to geosite
+				gs := &GeoSite{
+					CountryCode: strings.ToUpper(code), // v2ray expects an uppercased country code
+					Domain:      singItemToV2(itemlist),
+				}
+				geolist.Entry = append(geolist.Entry, gs)
+			}
+		}
+		// Sort protoList so the marshaled list is reproducible
+		sort.SliceStable(geolist.Entry, func(i, j int) bool {
+			return geolist.Entry[i].CountryCode < geolist.Entry[j].CountryCode
+		})
+		return geolist, nil
+	}
+
+	geositeList, err := LoadV2Site(fileContent, wantList)
+	if err == nil {
+		for i := 0; i < len(geositeList); i++ {
+			geolist.Entry = append(geolist.Entry, &geositeList[i])
+		}
+		// Sort protoList so the marshaled list is reproducible
+		sort.SliceStable(geolist.Entry, func(i, j int) bool {
+			return geolist.Entry[i].CountryCode < geolist.Entry[j].CountryCode
+		})
+		return geolist, nil
+	}
+	return nil, fmt.Errorf("Not a valid geosite format")
+}
+
 // to the ruleset json format of sing-box 1.20+
 func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.PlainRuleSetCompat, error) {
 	fileContent, err := os.ReadFile(file)
