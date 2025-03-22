@@ -22,7 +22,7 @@ var (
 )
 
 const (
-	VERSION string = "0.1.3"
+	VERSION string = "0.1.4"
 )
 
 func main() {
@@ -36,7 +36,7 @@ func main() {
 	myflag.BoolVar(&global.Regex, "regex", false, "allow regex rules in the geosite result")
 	myflag.StringVar(&global.Output, "output", "", "output to file, leave empty to print to console")
 	myflag.StringVar(&global.Target, "value", "", "ip or domain to lookup, required only for lookup action")
-	myflag.StringVar(&global.Format, "format", "ruleset", "convert output format. type: ruleset(srs) | quantumultx(qx) | json | geosite")
+	myflag.StringVar(&global.Format, "format", "ruleset", "convert output format. type: ruleset(srs) | quantumultx(qx) | json | geosite | geoip")
 	myflag.BoolVar(&global.Appendfile, "append", false, "append to existing file instead of overwriting")
 	myflag.BoolVar(&global.Lowmem, "lowmem", false, "low memory mode, reduce memory cost by partial file reading")
 	myflag.BoolVar(&version, "version", false, "print version")
@@ -225,6 +225,32 @@ func convert() {
 			} else {
 				printErrorln("Error:", err)
 			}
+		case "geoip":
+			if global.Output == "" {
+				printErrorln("Error: Output file for geoip conversion is required")
+				return
+			}
+			list := strings.Split(global.Want, ",")
+			wantMap := make(map[string]bool)
+			for _, v := range list {
+				wantMap[strings.ToUpper(strings.TrimSpace(v))] = true
+			}
+			data := &geoip.GeoIPDatIn{
+				URI:  global.Input,
+				Want: wantMap,
+			}
+			ret, err := data.ToGeoIP()
+			if err == nil {
+				protoBytes, err := proto.Marshal(ret)
+				if err == nil {
+					err = os.WriteFile(global.Output, protoBytes, 0644)
+				}
+				if err != nil {
+					printErrorln("Error:", err)
+				}
+			} else {
+				printErrorln("Error:", err)
+			}
 		case "qx":
 			fallthrough
 		case "quantumultx":
@@ -241,7 +267,7 @@ func convert() {
 				printErrorln("Error:", err)
 			}
 		default:
-			printErrorln("Error: convert from", global.Datatype, "to format", global.Format, "is not supported")
+			printErrorln("Error: converting from", global.Datatype, "to", global.Format, "is not supported")
 		}
 		return
 
@@ -309,7 +335,7 @@ func convert() {
 				printErrorln("Error:", err)
 			}
 		default:
-			printErrorln("Error: convert from", global.Datatype, "to format", global.Format, "is not supported")
+			printErrorln("Error: converting from", global.Datatype, "to", global.Format, "is not supported")
 		}
 	}
 }

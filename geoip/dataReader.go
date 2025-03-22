@@ -27,6 +27,36 @@ const (
 	IPv6 IPType = 2
 )
 
+func (g *GeoIPDatIn) ToGeoIP() (*GeoIPList, error) {
+	reader, err := os.Open(g.URI)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	ipList := new(GeoIPList)
+	reader.Seek(0, io.SeekStart)
+	codeList := protohelper.CodeListByReader(reader)
+	for _, code := range codeList {
+		if _, ok := g.Want[string(code)]; ok {
+			reader.Seek(0, io.SeekStart)
+			var geoip GeoIP
+			stripped := protohelper.FindCodeByReader(reader, code)
+			if stripped != nil {
+				proto.Unmarshal(stripped, &geoip)
+
+				if len(geoip.Cidr) > 0 {
+					ipList.Entry = append(ipList.Entry, &geoip)
+				}
+			} else {
+				// log.Println("code not found", code)
+			}
+			runtime.GC()
+		}
+	}
+	return ipList, nil
+}
+
 func (g *GeoIPDatIn) FindIP(ip string) (list []string) {
 	nip, ok := netipx.FromStdIP(net.ParseIP(ip))
 	if !ok {

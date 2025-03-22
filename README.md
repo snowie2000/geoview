@@ -5,13 +5,13 @@ Extract information from geoip and geosite files from Project X and Sing-box.
 ## Usage
 
 ```
-Usage:
+Usage of geoview:
   -action string
         action: extract | convert | lookup (default "extract")
   -append
         append to existing file instead of overwriting
   -format string
-        convert output format. type: ruleset(srs) | quantumultx(qx) (default "ruleset") | json
+        convert output format. type: ruleset(srs) | quantumultx(qx) | json | geosite | geoip (default "ruleset")
   -input string
         datafile
   -ipv4
@@ -30,6 +30,8 @@ Usage:
         datafile type: geoip | geosite (default "geoip")
   -value string
         ip or domain to lookup, required only for lookup action
+  -version
+        print version
 ```
 
 ## Examples
@@ -81,9 +83,11 @@ APPLE-UPDATE
 ```
 
 ## Convert into other formats
-There are currently two formats supported: 
+The following conversions are supported 
 - srs ruleset for singbox (*default)
 - filter for QuantumultX
+- converting from geosite to a subset of geosite
+- converting from geoip to a subset of geoip
 
 Format can be set by `-format` flag. abbr. is also accepted, such as `qx` for `quantumultx`
 
@@ -101,6 +105,16 @@ Format can be set by `-format` flag. abbr. is also accepted, such as `qx` for `q
 #### Extract domain list of medium and convert into QuantumultX filter set
 ```bash
 ./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.conf -format qx
+```
+
+#### Extract domain list of medium and convert into a new `Geosite.dat` to remove memory consumption
+```bash
+./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.dat -format geosite
+```
+
+#### Extract IPs of China and Japan and convert into a new `Geoip.dat` to remove memory consumption
+```bash
+./geoview -type geoip -action convert -input geoip.dat -list CN,JP -output cnjp.dat -format geoip
 ```
 
 * Regex rules of geosite are ignored by default.
