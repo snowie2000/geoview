@@ -107,12 +107,12 @@ Format can be set by `-format` flag. abbr. is also accepted, such as `qx` for `q
 ./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.conf -format qx
 ```
 
-#### Extract domain list of medium and convert into a new `Geosite.dat` to remove memory consumption
+#### Extract domain list of medium and convert into a new `Geosite.dat` to reduce memory consumption
 ```bash
 ./geoview -type geosite -action convert -input geosite.dat -list medium -output medium.dat -format geosite
 ```
 
-#### Extract IPs of China and Japan and convert into a new `Geoip.dat` to remove memory consumption
+#### Extract IPs of China and Japan and convert into a new `Geoip.dat` to reduce memory consumption
 ```bash
 ./geoview -type geoip -action convert -input geoip.dat -list CN,JP -output cnjp.dat -format geoip
 ```
