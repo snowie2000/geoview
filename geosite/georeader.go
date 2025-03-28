@@ -216,12 +216,20 @@ func ToGeosite(file string, wantList map[string][]string) (*GeoSiteList, error) 
 	if err != nil {
 		return nil, err
 	}
+	codeList := make(map[string][]string)
+	for c := range wantList {
+		// remove duplicate codes, remove attributes
+		sn := strings.SplitN(c, "@", 2)
+		if _, ok := codeList[sn[0]]; !ok {
+			codeList[sn[0]] = nil
+		}
+	}
 	geolist := new(GeoSiteList)
 	// sing-box geosite
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
 		for _, code := range codes {
-			if _, ok := wantList[strings.ToUpper(code)]; !ok {
+			if _, ok := codeList[strings.ToUpper(code)]; !ok {
 				continue // skip unwanted codes
 			}
 			tmpList := make(map[string][]string)
@@ -243,7 +251,7 @@ func ToGeosite(file string, wantList map[string][]string) (*GeoSiteList, error) 
 		return geolist, nil
 	}
 
-	geositeList, err := LoadV2Site(fileContent, wantList)
+	geositeList, err := LoadV2Site(fileContent, codeList)
 	if err == nil {
 		for i := 0; i < len(geositeList); i++ {
 			geolist.Entry = append(geolist.Entry, &geositeList[i])
