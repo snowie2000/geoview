@@ -18,7 +18,8 @@ import (
 )
 
 var (
-	version bool
+	version  bool
+	exitCode = 0
 )
 
 const (
@@ -79,6 +80,7 @@ func main() {
 	default:
 		printErrorln("Error: unknown action:", global.Action)
 	}
+	os.Exit(exitCode)
 }
 
 // list all stored codes in the database
@@ -415,8 +417,10 @@ func outputToFile(fileName string, lines []string, appendfile bool) error {
 
 func printErrorln(args ...any) {
 	fmt.Fprintln(os.Stderr, args...)
+	exitCode = 1
 }
 
 func printErrorf(str string, args ...any) {
 	fmt.Fprintf(os.Stderr, str, args...)
+	exitCode = 1
 }

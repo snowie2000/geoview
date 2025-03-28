@@ -1,6 +1,7 @@
 package geoip
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -107,6 +108,9 @@ func (g *GeoIPDatIn) ToRuleSet(ipType IPType) (*srs.PlainRuleSetCompat, error) {
 	cidrlist, err := g.Extract(ipType)
 	if err != nil {
 		return nil, err
+	}
+	if len(cidrlist) == 0 {
+		return nil, errors.New("empty ip set")
 	}
 
 	ruleset := &srs.PlainRuleSetCompat{

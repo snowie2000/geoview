@@ -269,6 +269,9 @@ func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.Plai
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
 		_, itemlist, err := extractSingGeoSite(geoReader, codes, wantList, regex, false)
+		if len(itemlist) == 0 {
+			return nil, errors.New("empty domain set")
+		}
 		if err == nil {
 			return itemToRuleset(itemlist)
 		}
@@ -278,6 +281,9 @@ func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.Plai
 	geositeList, err = LoadV2Site(fileContent, wantList)
 	if err == nil {
 		_, itemlist, err := extractV2GeoSite(geositeList, wantList, regex, false)
+		if len(itemlist) == 0 {
+			return nil, errors.New("empty domain set")
+		}
 		if err == nil {
 			return itemToRuleset(itemlist)
 		}
