@@ -144,7 +144,7 @@ Follow the steps below to compile the package.
 
 make menuconfig
 
-Network  ---> Web Servers/Proxies  ---> <*> geoview
+Network  ---> IP Addresses and Names  ---> <*> geoview
 
 make package/geoview/{clean,compile} V=s
 ```
