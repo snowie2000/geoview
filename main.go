@@ -19,11 +19,12 @@ import (
 
 var (
 	version  bool
+	strict   bool
 	exitCode = 0
 )
 
 const (
-	VERSION string = "0.1.4"
+	VERSION string = "0.1.5"
 )
 
 func main() {
@@ -41,6 +42,7 @@ func main() {
 	myflag.BoolVar(&global.Appendfile, "append", false, "append to existing file instead of overwriting")
 	myflag.BoolVar(&global.Lowmem, "lowmem", false, "low memory mode, reduce memory cost by partial file reading")
 	myflag.BoolVar(&version, "version", false, "print version")
+	myflag.BoolVar(&strict, "strict", true, "strict mode, non-existent code will result in an error")
 	myflag.SetOutput(io.Discard)
 	myflag.Parse(os.Args[1:])
 	myflag.SetOutput(nil)
@@ -132,8 +134,9 @@ func extract() {
 			wantMap[strings.ToUpper(strings.TrimSpace(v))] = true
 		}
 		data := &geoip.GeoIPDatIn{
-			URI:  global.Input,
-			Want: wantMap,
+			URI:       global.Input,
+			Want:      wantMap,
+			MustExist: strict,
 		}
 		var tp geoip.IPType = 0
 		if global.Ipv4 {
@@ -166,7 +169,11 @@ func extract() {
 			parts := strings.Split(strings.ToLower(v), "@") // attributes are lowercased
 			wantMap[strings.ToUpper(parts[0])] = parts[1:]
 		}
-		ret, err := geosite.Extract(global.Input, wantMap, global.Regex)
+		gsreader := &geosite.GSReader{
+			File:      global.Input,
+			MustExist: strict,
+		}
+		ret, err := gsreader.Extract(wantMap, global.Regex)
 		if err == nil {
 			if global.Output != "" { // output to file
 				err = outputToFile(global.Output, ret, global.Appendfile)
@@ -193,8 +200,9 @@ func convert() {
 			wantMap[strings.ToUpper(strings.TrimSpace(v))] = true
 		}
 		data := &geoip.GeoIPDatIn{
-			URI:  global.Input,
-			Want: wantMap,
+			URI:       global.Input,
+			Want:      wantMap,
+			MustExist: strict,
 		}
 		var tp geoip.IPType = 0
 		if global.Ipv4 {
@@ -238,8 +246,9 @@ func convert() {
 				wantMap[strings.ToUpper(strings.TrimSpace(v))] = true
 			}
 			data := &geoip.GeoIPDatIn{
-				URI:  global.Input,
-				Want: wantMap,
+				URI:       global.Input,
+				Want:      wantMap,
+				MustExist: strict,
 			}
 			ret, err := data.ToGeoIP()
 			if err == nil {
@@ -287,7 +296,11 @@ func convert() {
 		case "srs":
 			fallthrough
 		case "ruleset": //ruleset binary
-			ret, err := geosite.ToRuleSet(global.Input, wantMap, global.Regex)
+			gsreader := &geosite.GSReader{
+				File:      global.Input,
+				MustExist: strict,
+			}
+			ret, err := gsreader.ToRuleSet(wantMap, global.Regex)
 			if err == nil {
 				if global.Output != "" { // output to file
 					err = outputRulesetToFile(global.Output, ret, global.Format)
@@ -309,7 +322,11 @@ func convert() {
 				printErrorln("Error: Output file for geosite conversion is required")
 				return
 			}
-			ret, err := geosite.ToGeosite(global.Input, wantMap)
+			gsreader := &geosite.GSReader{
+				File:      global.Input,
+				MustExist: strict,
+			}
+			ret, err := gsreader.ToGeosite(wantMap)
 			if err == nil {
 				protoBytes, err := proto.Marshal(ret)
 				if err == nil {
@@ -324,7 +341,11 @@ func convert() {
 		case "qx":
 			fallthrough
 		case "quantumultx":
-			ret, err := geosite.ToQuantumultX(global.Input, wantMap)
+			gsreader := &geosite.GSReader{
+				File:      global.Input,
+				MustExist: strict,
+			}
+			ret, err := gsreader.ToQuantumultX(wantMap)
 			if err == nil {
 				if global.Output != "" {
 					outputToFile(global.Output, ret, global.Appendfile)
@@ -346,14 +367,19 @@ func lookup() {
 	switch global.Datatype {
 	case "geoip":
 		data := &geoip.GeoIPDatIn{
-			URI: global.Input,
+			URI:       global.Input,
+			MustExist: strict,
 		}
 		list := data.FindIP(global.Target)
 		for _, code := range list {
 			fmt.Println(code)
 		}
 	case "geosite":
-		ret, err := geosite.Lookup(global.Input, global.Target)
+		gsreader := &geosite.GSReader{
+			File:      global.Input,
+			MustExist: strict,
+		}
+		ret, err := gsreader.Lookup(global.Target)
 		if err == nil {
 			for _, code := range ret {
 				fmt.Println(code)

@@ -17,8 +17,9 @@ import (
 )
 
 type GeoIPDatIn struct {
-	URI  string
-	Want map[string]bool
+	URI       string
+	Want      map[string]bool
+	MustExist bool
 }
 
 type IPType int
@@ -239,8 +240,8 @@ func (g *GeoIPDatIn) generateEntries(reader io.ReadSeeker, entries map[string]*E
 				ipStr := net.IP(v2rayCIDR.GetIp()).String() + "/" + fmt.Sprint(v2rayCIDR.GetPrefix())
 				ipStrList = append(ipStrList, ipStr)
 			}
-		} else {
-			// log.Println("code not found", code)
+		} else if g.MustExist {
+			return fmt.Errorf("%s doesn't exist", code)
 		}
 	}
 
@@ -278,8 +279,8 @@ func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, entries map[s
 					ipStr := net.IP(v2rayCIDR.GetIp()).String() + "/" + fmt.Sprint(v2rayCIDR.GetPrefix())
 					ipStrList = append(ipStrList, ipStr)
 				}
-			} else {
-				// log.Println("code not found", code)
+			} else if g.MustExist {
+				return fmt.Errorf("%s doesn't exist", code)
 			}
 			runtime.GC()
 		}

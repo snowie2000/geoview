@@ -26,6 +26,8 @@ Usage of geoview:
         output to file, leave empty to print to console
   -regex
         allow regex rules in the geosite result
+  -strict
+        strict mode, non-existent code will result in an error (default true)
   -type string
         datafile type: geoip | geosite (default "geoip")
   -value string

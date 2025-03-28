@@ -22,7 +22,12 @@ var matcherTypeMap = map[Domain_Type]strmatcher.Type{
 	Domain_Full:   strmatcher.Full,
 }
 
-func extractV2GeoSite(geositeList []GeoSite, want map[string][]string, regex bool, keyword bool) (list []string, itemlist []Item, err error) {
+type GSReader struct {
+	File      string
+	MustExist bool
+}
+
+func (r *GSReader) extractV2GeoSite(geositeList []GeoSite, want map[string][]string, regex bool, keyword bool) (list []string, itemlist []Item, err error) {
 	match := false
 	for _, site := range geositeList {
 		if v, ok := want[strings.ToUpper(site.CountryCode)]; !ok {
@@ -68,7 +73,7 @@ func extractV2GeoSite(geositeList []GeoSite, want map[string][]string, regex boo
 	return
 }
 
-func extractSingGeoSite(geoReader *GeoSiteReader, codes []string, wantList map[string][]string, regex bool, keyword bool) (list []string, itemlist []Item, err error) {
+func (r *GSReader) extractSingGeoSite(geoReader *GeoSiteReader, codes []string, wantList map[string][]string, regex bool, keyword bool) (list []string, itemlist []Item, err error) {
 	for code, _ := range wantList {
 		// singbox rulec codes are always lowercased
 		if item, err := geoReader.Read(strings.ToLower(code)); err == nil {
@@ -96,12 +101,14 @@ func extractSingGeoSite(geoReader *GeoSiteReader, codes []string, wantList map[s
 					itemlist = append(itemlist, it)
 				}
 			}
+		} else if r.MustExist {
+			return nil, nil, err
 		}
 	}
 	return
 }
 
-func matchSiteAgainstList(domains []*Domain, domain string) (bool, error) {
+func (r *GSReader) matchSiteAgainstList(domains []*Domain, domain string) (bool, error) {
 	g := strmatcher.NewMphMatcherGroup()
 	for _, d := range domains {
 		matcherType, f := matcherTypeMap[d.Type]
@@ -118,8 +125,8 @@ func matchSiteAgainstList(domains []*Domain, domain string) (bool, error) {
 }
 
 // search for a domain in all geosite sites and return matched site codes
-func Lookup(file string, domain string) ([]string, error) {
-	fileContent, err := os.ReadFile(file)
+func (r *GSReader) Lookup(domain string) ([]string, error) {
+	fileContent, err := os.ReadFile(r.File)
 	if err != nil {
 		return nil, err
 	}
@@ -130,10 +137,10 @@ func Lookup(file string, domain string) ([]string, error) {
 	if err == nil && len(codes) > 0 {
 		for _, code := range codes {
 			wantList := map[string][]string{
-				code: []string{},
+				code: nil,
 			}
-			if _, items, err := extractSingGeoSite(geoReader, []string{code}, wantList, true, true); err == nil {
-				if ok, _ := matchSiteAgainstList(singItemToV2(items), domain); ok {
+			if _, items, err := r.extractSingGeoSite(geoReader, []string{code}, wantList, true, true); err == nil {
+				if ok, _ := r.matchSiteAgainstList(singItemToV2(items), domain); ok {
 					matchedList = append(matchedList, code)
 				}
 			}
@@ -148,8 +155,8 @@ func Lookup(file string, domain string) ([]string, error) {
 			wantList := map[string][]string{
 				sc: []string{},
 			}
-			if geositeList, err := LoadV2Site(fileContent, wantList); err == nil && len(geositeList) > 0 {
-				if ok, _ := matchSiteAgainstList(geositeList[0].Domain, domain); ok {
+			if geositeList, err := LoadV2Site(fileContent, wantList, r.MustExist); err == nil && len(geositeList) > 0 {
+				if ok, _ := r.matchSiteAgainstList(geositeList[0].Domain, domain); ok {
 					matchedList = append(matchedList, sc)
 
 					// now try extra matches with attributes
@@ -167,11 +174,13 @@ func Lookup(file string, domain string) ([]string, error) {
 					}
 					// now match against each sub group
 					for attr, g := range groups {
-						if ok, _ := matchSiteAgainstList(g, domain); ok {
+						if ok, _ := r.matchSiteAgainstList(g, domain); ok {
 							matchedList = append(matchedList, sc+"@"+attr)
 						}
 					}
 				}
+			} else {
+				return nil, err
 			}
 		}
 		return matchedList, nil
@@ -180,8 +189,8 @@ func Lookup(file string, domain string) ([]string, error) {
 	return nil, fmt.Errorf("Not a valid geosite format")
 }
 
-func Extract(file string, wantList map[string][]string, regex bool) ([]string, error) {
-	fileContent, err := os.ReadFile(file)
+func (r *GSReader) Extract(wantList map[string][]string, regex bool) ([]string, error) {
+	fileContent, err := os.ReadFile(r.File)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +199,7 @@ func Extract(file string, wantList map[string][]string, regex bool) ([]string, e
 	// try sing-box geosite
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
-		domains, _, err := extractSingGeoSite(geoReader, codes, wantList, regex, false)
+		domains, _, err := r.extractSingGeoSite(geoReader, codes, wantList, regex, false)
 		if err == nil {
 			domains = common.Uniq(domains)
 			sort.Strings(domains)
@@ -198,9 +207,9 @@ func Extract(file string, wantList map[string][]string, regex bool) ([]string, e
 		return domains, err
 	}
 
-	geositeList, err = LoadV2Site(fileContent, wantList)
+	geositeList, err = LoadV2Site(fileContent, wantList, r.MustExist)
 	if err == nil {
-		domains, _, err := extractV2GeoSite(geositeList, wantList, regex, false)
+		domains, _, err := r.extractV2GeoSite(geositeList, wantList, regex, false)
 		if err == nil {
 			domains = common.Uniq(domains)
 			sort.Strings(domains)
@@ -208,11 +217,11 @@ func Extract(file string, wantList map[string][]string, regex bool) ([]string, e
 		return domains, err
 	}
 
-	return nil, fmt.Errorf("Not a valid geosite format")
+	return nil, fmt.Errorf("Extract failed: %s", err.Error())
 }
 
-func ToGeosite(file string, wantList map[string][]string) (*GeoSiteList, error) {
-	fileContent, err := os.ReadFile(file)
+func (r *GSReader) ToGeosite(wantList map[string][]string) (*GeoSiteList, error) {
+	fileContent, err := os.ReadFile(r.File)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +243,7 @@ func ToGeosite(file string, wantList map[string][]string) (*GeoSiteList, error) 
 			}
 			tmpList := make(map[string][]string)
 			tmpList[code] = nil // the value never gets read
-			_, itemlist, err := extractSingGeoSite(geoReader, codes, tmpList, true, true)
+			_, itemlist, err := r.extractSingGeoSite(geoReader, codes, tmpList, true, true)
 			if err == nil {
 				// convert Item to geosite
 				gs := &GeoSite{
@@ -251,7 +260,7 @@ func ToGeosite(file string, wantList map[string][]string) (*GeoSiteList, error) 
 		return geolist, nil
 	}
 
-	geositeList, err := LoadV2Site(fileContent, codeList)
+	geositeList, err := LoadV2Site(fileContent, codeList, r.MustExist)
 	if err == nil {
 		for i := 0; i < len(geositeList); i++ {
 			geolist.Entry = append(geolist.Entry, &geositeList[i])
@@ -262,12 +271,12 @@ func ToGeosite(file string, wantList map[string][]string) (*GeoSiteList, error) 
 		})
 		return geolist, nil
 	}
-	return nil, fmt.Errorf("Not a valid geosite format")
+	return nil, fmt.Errorf("Convert to geosite failed: %s", err.Error())
 }
 
 // to the ruleset json format of sing-box 1.20+
-func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.PlainRuleSetCompat, error) {
-	fileContent, err := os.ReadFile(file)
+func (r *GSReader) ToRuleSet(wantList map[string][]string, regex bool) (*srs.PlainRuleSetCompat, error) {
+	fileContent, err := os.ReadFile(r.File)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +285,7 @@ func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.Plai
 	// try sing-box geosite
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
-		_, itemlist, err := extractSingGeoSite(geoReader, codes, wantList, regex, false)
+		_, itemlist, err := r.extractSingGeoSite(geoReader, codes, wantList, regex, false)
 		if len(itemlist) == 0 {
 			return nil, errors.New("empty domain set")
 		}
@@ -286,9 +295,9 @@ func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.Plai
 		return nil, err
 	}
 
-	geositeList, err = LoadV2Site(fileContent, wantList)
+	geositeList, err = LoadV2Site(fileContent, wantList, r.MustExist)
 	if err == nil {
-		_, itemlist, err := extractV2GeoSite(geositeList, wantList, regex, false)
+		_, itemlist, err := r.extractV2GeoSite(geositeList, wantList, regex, false)
 		if len(itemlist) == 0 {
 			return nil, errors.New("empty domain set")
 		}
@@ -297,11 +306,11 @@ func ToRuleSet(file string, wantList map[string][]string, regex bool) (*srs.Plai
 		}
 		return nil, err
 	}
-	return nil, fmt.Errorf("Not a valid geosite format")
+	return nil, fmt.Errorf("Convert to ruleset failed: %s", err.Error())
 }
 
-func ToQuantumultX(file string, wantList map[string][]string) ([]string, error) {
-	fileContent, err := os.ReadFile(file)
+func (r *GSReader) ToQuantumultX(wantList map[string][]string) ([]string, error) {
+	fileContent, err := os.ReadFile(r.File)
 	if err != nil {
 		return nil, err
 	}
@@ -309,22 +318,22 @@ func ToQuantumultX(file string, wantList map[string][]string) ([]string, error) 
 	// try sing-box geosite
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
-		_, itemlist, err := extractSingGeoSite(geoReader, codes, wantList, false, false)
+		_, itemlist, err := r.extractSingGeoSite(geoReader, codes, wantList, false, false)
 		if err == nil {
 			return itemToQxRule(itemlist)
 		}
 		return nil, err
 	}
 
-	geositeList, err = LoadV2Site(fileContent, wantList)
+	geositeList, err = LoadV2Site(fileContent, wantList, r.MustExist)
 	if err == nil {
-		_, itemlist, err := extractV2GeoSite(geositeList, wantList, false, true)
+		_, itemlist, err := r.extractV2GeoSite(geositeList, wantList, false, true)
 		if err == nil {
 			return itemToQxRule(itemlist)
 		}
 		return nil, err
 	}
-	return nil, fmt.Errorf("Not a valid geosite format")
+	return nil, fmt.Errorf("Convert to QuantumultX failed: %s", err.Error())
 }
 
 func itemToQxRule(itemlist []Item) ([]string, error) {
