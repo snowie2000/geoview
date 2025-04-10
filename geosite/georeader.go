@@ -373,12 +373,8 @@ func itemToRuleset(itemlist []Item) (*srs.PlainRuleSetCompat, error) {
 		case RuleTypeDomainRegex:
 			rule.DefaultOptions.DomainRegex = append(rule.DefaultOptions.DomainRegex, it.Value)
 		case RuleTypeDomainSuffix:
-			// domain suffix starting with a dot will fail to match with non-subdomains
-			// we need to remove it
+			// *ray and sing-box support both suffix w/o dot, we preserve what we get
 			domain := it.Value
-			if len(domain) > 0 && (domain[0] == '.') {
-				domain = domain[1:]
-			}
 			rule.DefaultOptions.DomainSuffix = append(rule.DefaultOptions.DomainSuffix, domain)
 		}
 	}
