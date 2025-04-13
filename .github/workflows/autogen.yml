@@ -22,7 +22,7 @@ jobs:
       run: |
         sudo curl -L -o /opt/geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
         sudo curl -L -o /opt/geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-        sudo curl -L -o /opt/geoview_linux_amd64 https://github.com/snowie2000/geoview/releases/latest/download/geoview-linux-amd64
+        sudo curl -L -o /opt/geoview-linux-amd64 https://github.com/snowie2000/geoview/releases/latest/download/geoview-linux-amd64
         sudo chmod +x /opt/geoview-linux-amd64
 
     - name: Generate rules
