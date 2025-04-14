@@ -1,4 +1,4 @@
-name: Build Go Binaries for linux
+name: Build Go Binaries
 
 on:
   workflow_dispatch:
@@ -31,8 +31,12 @@ jobs:
           - arch: mips64
           - arch: mips64le
           - arch: riscv64
+          - arch: amd64
+            goos: windows
+          - arch: 386
+            goos: windows
 
-    name: Build for ${{ matrix.arch }}${{ matrix.goarm && format(' (GOARM={0})', matrix.goarm) || '' }}
+    name: Build for ${{ matrix.goos || 'linux' }}-${{ matrix.arch }}${{ matrix.goarm && format(' (GOARM={0})', matrix.goarm) || '' }}
 
     steps:
       - name: Checkout Source
@@ -52,20 +56,27 @@ jobs:
         run: |
           mkdir -p build
 
-          if [[ "${{ matrix.arch }}" == "386" ]]; then
+          GOOS=${{ matrix.goos || 'linux' }}
+          GOARCH=${{ matrix.arch }}
+
+          if [[ "$GOARCH" == "386" && "$GOOS" == "windows" ]]; then
+            OUTPUT_FILE="geoview-windows-i386.exe"
+          elif [[ "$GOARCH" == "amd64" && "$GOOS" == "windows" ]]; then
+            OUTPUT_FILE="geoview-windows-amd64.exe"
+          elif [[ "$GOARCH" == "386" ]]; then
             OUTPUT_FILE="geoview-linux-i386"
-          elif [[ "${{ matrix.arch }}" == "arm" ]]; then
+          elif [[ "$GOARCH" == "arm" ]]; then
             OUTPUT_FILE="geoview-linux-armv${{ matrix.goarm }}"
-            export GOARM=${{ matrix.goarm }}
           else
-            OUTPUT_FILE="geoview-linux-${{ matrix.arch }}"
+            OUTPUT_FILE="geoview-linux-${GOARCH}"
           fi
 
+          export GOARM=${{ matrix.goarm || '' }}
           export CGO_ENABLED=0
-          GOOS=linux GOARCH=${{ matrix.arch }} GOARM=$GOARM \
+          GOOS=$GOOS GOARCH=$GOARCH GOARM=$GOARM \
           go build -ldflags="-s -w" -o build/$OUTPUT_FILE main.go
 
-          if [[ "${{ matrix.arch }}" != "mips64" && "${{ matrix.arch }}" != "mips64le" && "${{ matrix.arch }}" != "riscv64" ]]; then
+          if [[ "$GOOS" != "windows" && "$GOARCH" != "mips64" && "$GOARCH" != "mips64le" && "$GOARCH" != "riscv64" ]]; then
             upx build/$OUTPUT_FILE
           else
             echo "Skipping UPX compression for $OUTPUT_FILE (not supported)"
@@ -91,4 +102,4 @@ jobs:
           token: ${{ github.token }}
           repository: ${{ github.repository }}
           retain_days: 1
-          keep_minimum_runs: 1
+          keep_minimum_runs: 0
