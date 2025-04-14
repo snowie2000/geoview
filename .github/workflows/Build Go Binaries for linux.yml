@@ -30,6 +30,7 @@ jobs:
           - arch: mipsle
           - arch: mips64
           - arch: mips64le
+          - arch: riscv64
 
     name: Build for ${{ matrix.arch }}${{ matrix.goarm && format(' (GOARM={0})', matrix.goarm) || '' }}
 
@@ -64,7 +65,7 @@ jobs:
           GOOS=linux GOARCH=${{ matrix.arch }} GOARM=$GOARM \
           go build -ldflags="-s -w" -o build/$OUTPUT_FILE main.go
 
-          if [[ "${{ matrix.arch }}" != "mips64" && "${{ matrix.arch }}" != "mips64le" ]]; then
+          if [[ "${{ matrix.arch }}" != "mips64" && "${{ matrix.arch }}" != "mips64le" && "${{ matrix.arch }}" != "riscv64" ]]; then
             upx build/$OUTPUT_FILE
           else
             echo "Skipping UPX compression for $OUTPUT_FILE (not supported)"
