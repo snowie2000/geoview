@@ -48,9 +48,10 @@ jobs:
           go-version: '1.24'
 
       - name: Install UPX
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y upx
+        uses: crazy-max/ghaction-upx@v3
+        with:
+          version: latest
+          install-only: true
 
       - name: Build Binary
         run: |
@@ -76,8 +77,8 @@ jobs:
           GOOS=$GOOS GOARCH=$GOARCH GOARM=$GOARM \
           go build -ldflags="-s -w" -o build/$OUTPUT_FILE main.go
 
-          if [[ "$GOOS" != "windows" && "$GOARCH" != "mips64" && "$GOARCH" != "mips64le" && "$GOARCH" != "riscv64" ]]; then
-            upx build/$OUTPUT_FILE
+          if [[ "$GOARCH" != "mips64" && "$GOARCH" != "mips64le" && "$GOARCH" != "riscv64" ]]; then
+            upx --lzma --best build/$OUTPUT_FILE
           else
             echo "Skipping UPX compression for $OUTPUT_FILE (not supported)"
           fi
