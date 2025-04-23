@@ -24,7 +24,7 @@ var (
 )
 
 const (
-	VERSION string = "0.1.6"
+	VERSION string = "0.1.7"
 )
 
 func main() {
@@ -40,7 +40,7 @@ func main() {
 	myflag.StringVar(&global.Target, "value", "", "ip or domain to lookup, required only for lookup action")
 	myflag.StringVar(&global.Format, "format", "ruleset", "convert output format. type: ruleset(srs) | quantumultx(qx) | json | geosite | geoip")
 	myflag.BoolVar(&global.Appendfile, "append", false, "append to existing file instead of overwriting")
-	myflag.BoolVar(&global.Lowmem, "lowmem", false, "low memory mode, reduce memory cost by partial file reading")
+	myflag.BoolVar(&global.Lowmem, "lowmem", true, "low memory mode, reduce memory cost by partial file reading")
 	myflag.BoolVar(&version, "version", false, "print version")
 	myflag.BoolVar(&strict, "strict", true, "strict mode, non-existent code will result in an error")
 	myflag.SetOutput(io.Discard)
@@ -98,7 +98,7 @@ func listCodes() {
 		list := protohelper.CodeListByReader(file)
 		fmt.Println("Available codes:")
 		for _, code := range list {
-			fmt.Println(string(code))
+			fmt.Println(code.Name)
 		}
 
 	case "geosite":
@@ -169,10 +169,7 @@ func extract() {
 			parts := strings.Split(strings.ToLower(v), "@") // attributes are lowercased
 			wantMap[strings.ToUpper(parts[0])] = parts[1:]
 		}
-		gsreader := &geosite.GSReader{
-			File:      global.Input,
-			MustExist: strict,
-		}
+		gsreader := geosite.NewGeositeHandler(global.Input, strict, global.Lowmem)
 		ret, err := gsreader.Extract(wantMap, global.Regex)
 		if err == nil {
 			if global.Output != "" { // output to file
@@ -296,10 +293,7 @@ func convert() {
 		case "srs":
 			fallthrough
 		case "ruleset": //ruleset binary
-			gsreader := &geosite.GSReader{
-				File:      global.Input,
-				MustExist: strict,
-			}
+			gsreader := geosite.NewGeositeHandler(global.Input, strict, global.Lowmem)
 			ret, err := gsreader.ToRuleSet(wantMap, global.Regex)
 			if err == nil {
 				if global.Output != "" { // output to file
@@ -322,10 +316,7 @@ func convert() {
 				printErrorln("Error: Output file for geosite conversion is required")
 				return
 			}
-			gsreader := &geosite.GSReader{
-				File:      global.Input,
-				MustExist: strict,
-			}
+			gsreader := geosite.NewGeositeHandler(global.Input, strict, global.Lowmem)
 			ret, err := gsreader.ToGeosite(wantMap)
 			if err == nil {
 				protoBytes, err := proto.Marshal(ret)
@@ -341,10 +332,7 @@ func convert() {
 		case "qx":
 			fallthrough
 		case "quantumultx":
-			gsreader := &geosite.GSReader{
-				File:      global.Input,
-				MustExist: strict,
-			}
+			gsreader := geosite.NewGeositeHandler(global.Input, strict, global.Lowmem)
 			ret, err := gsreader.ToQuantumultX(wantMap)
 			if err == nil {
 				if global.Output != "" {
@@ -375,10 +363,7 @@ func lookup() {
 			fmt.Println(code)
 		}
 	case "geosite":
-		gsreader := &geosite.GSReader{
-			File:      global.Input,
-			MustExist: strict,
-		}
+		gsreader := geosite.NewGeositeHandler(global.Input, strict, global.Lowmem)
 		ret, err := gsreader.Lookup(global.Target)
 		if err == nil {
 			for _, code := range ret {

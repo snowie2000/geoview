@@ -6,6 +6,12 @@ import (
 	"log"
 )
 
+type CodeIndex struct {
+	Name   string
+	Offset int64
+	Size   int64
+}
+
 func FindCode(data, code []byte) []byte {
 	codeL := len(code)
 	if codeL == 0 {
@@ -86,14 +92,18 @@ func FindCodeByReader(data io.ReadSeeker, code []byte) []byte {
 	}
 }
 
-func CodeListByReader(data io.ReadSeeker) (list [][]byte) {
+func CodeListByReader(data io.ReadSeeker) (list map[string]CodeIndex) {
 	var (
-		header []byte = make([]byte, 30)
-		count  int
-		err    error
+		header  []byte = make([]byte, 30)
+		count   int
+		err     error
+		tracked = NewReadSeeker(data)
 	)
+	list = make(map[string]CodeIndex)
+
+	tracked.Seek(0, io.SeekStart)
 	for {
-		if count, err = io.ReadAtLeast(data, header, 2); err != nil {
+		if count, err = io.ReadAtLeast(tracked, header, 2); err != nil {
 			return
 		}
 		x, y := decodeVarint(header[1:])
@@ -101,18 +111,22 @@ func CodeListByReader(data io.ReadSeeker) (list [][]byte) {
 			return
 		}
 		headL, bodyL := 1+y, int(x)
-		data.Seek(int64(headL-count), io.SeekCurrent)
-		if _, err = io.ReadFull(data, header[:2]); err != nil {
+		tracked.Seek(int64(headL-count), io.SeekCurrent)
+		if _, err = io.ReadFull(tracked, header[:2]); err != nil {
 			return
 		}
 		size := header[1]
 		if size > 0 {
 			code := make([]byte, size)
-			_, err = io.ReadFull(data, code)
-			list = append(list, code)
+			_, err = io.ReadFull(tracked, code)
+			list[string(code)] = CodeIndex{
+				Name:   string(code),
+				Size:   int64(bodyL),
+				Offset: tracked.Offset() - int64(size) - 2,
+			}
 		}
 		// log.Println(bodyL, size)
-		data.Seek(int64(bodyL-2-int(size)), io.SeekCurrent)
+		tracked.Seek(int64(bodyL-2-int(size)), io.SeekCurrent)
 	}
 	return
 }

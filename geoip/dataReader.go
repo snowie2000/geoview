@@ -40,10 +40,11 @@ func (g *GeoIPDatIn) ToGeoIP() (*GeoIPList, error) {
 	reader.Seek(0, io.SeekStart)
 	codeList := protohelper.CodeListByReader(reader)
 	for _, code := range codeList {
-		if _, ok := g.Want[string(code)]; ok {
-			reader.Seek(0, io.SeekStart)
+		if _, ok := g.Want[code.Name]; ok {
+			reader.Seek(0, int(code.Offset))
 			var geoip GeoIP
-			stripped := protohelper.FindCodeByReader(reader, code)
+			stripped := make([]byte, code.Size)
+			io.ReadFull(reader, stripped)
 			if stripped != nil {
 				proto.Unmarshal(stripped, &geoip)
 
@@ -76,9 +77,10 @@ func (g *GeoIPDatIn) FindIP(ip string) (list []string) {
 	codeList := protohelper.CodeListByReader(file) // get all available geoip codes
 	// codeList := protohelper.CodeList(geoipBytes)
 	for _, code := range codeList {
+		file.Seek(0, int(code.Offset))
 		var geoip GeoIP
-		file.Seek(0, io.SeekStart)
-		stripped := protohelper.FindCodeByReader(file, code)
+		stripped := make([]byte, code.Size)
+		io.ReadFull(file, stripped)
 		if stripped != nil {
 			proto.Unmarshal(stripped, &geoip)
 			entry := NewEntry("finder")
@@ -91,12 +93,12 @@ func (g *GeoIPDatIn) FindIP(ip string) (list []string) {
 			if nip.Is4() {
 				// ipv4 check
 				if s, err := entry.GetIPv4Set(); err == nil && s.Contains(nip) {
-					list = append(list, string(code))
+					list = append(list, code.Name)
 				}
 			} else {
 				// ipv6 check
 				if s, err := entry.GetIPv6Set(); err == nil && s.Contains(nip) {
-					list = append(list, string(code))
+					list = append(list, code.Name)
 				}
 			}
 		} else {
@@ -268,10 +270,11 @@ func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, entries map[s
 	codeList := protohelper.CodeListByReader(reader)
 	ipStrList := make([]string, 0)
 	for _, code := range codeList {
-		if _, ok := g.Want[string(code)]; ok {
-			reader.Seek(0, io.SeekStart)
+		if _, ok := g.Want[code.Name]; ok {
+			reader.Seek(0, int(code.Offset))
 			var geoip GeoIP
-			stripped := protohelper.FindCodeByReader(reader, code)
+			stripped := make([]byte, code.Size)
+			io.ReadFull(reader, stripped)
 			if stripped != nil {
 				proto.Unmarshal(stripped, &geoip)
 

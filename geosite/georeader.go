@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/snowie2000/geoview/protohelper"
 	"github.com/snowie2000/geoview/strmatcher"
 
 	"github.com/sagernet/sing/common"
@@ -20,6 +19,22 @@ var matcherTypeMap = map[Domain_Type]strmatcher.Type{
 	Domain_Regex:  strmatcher.Regex,
 	Domain_Domain: strmatcher.Domain,
 	Domain_Full:   strmatcher.Full,
+}
+
+type GSHandler interface {
+	Lookup(domain string) ([]string, error)
+	Extract(wantList map[string][]string, regex bool) ([]string, error)
+	ToGeosite(wantList map[string][]string) (*GeoSiteList, error)
+	ToRuleSet(wantList map[string][]string, regex bool) (*srs.PlainRuleSetCompat, error)
+	ToQuantumultX(wantList map[string][]string) ([]string, error)
+}
+
+func NewGeositeHandler(filename string, mustexist bool, lowmem bool) GSHandler {
+	if lowmem {
+		return &GSReaderLowMem{GSReader{filename, mustexist}}
+	} else {
+		return &GSReader{filename, mustexist}
+	}
 }
 
 type GSReader struct {
@@ -148,16 +163,14 @@ func (r *GSReader) Lookup(domain string) ([]string, error) {
 		return matchedList, nil
 	}
 
-	sitecodes := protohelper.CodeList(fileContent)
-	if len(sitecodes) > 0 {
+	v2site, err := LoadV2Site(fileContent)
+	if err == nil {
+		defer v2site.Close()
+		sitecodes := v2site.Codes()
 		for _, code := range sitecodes {
-			sc := string(code)
-			wantList := map[string][]string{
-				sc: []string{},
-			}
-			if geositeList, err := LoadV2Site(fileContent, wantList, r.MustExist); err == nil && len(geositeList) > 0 {
+			if geositeList, err := v2site.ReadSites([]string{code}, r.MustExist); err == nil && len(geositeList) > 0 {
 				if ok, _ := r.matchSiteAgainstList(geositeList[0].Domain, domain); ok {
-					matchedList = append(matchedList, sc)
+					matchedList = append(matchedList, code)
 
 					// now try extra matches with attributes
 					groups := make(map[string][]*Domain) // separate into multiple domain groups with each attributes
@@ -175,12 +188,10 @@ func (r *GSReader) Lookup(domain string) ([]string, error) {
 					// now match against each sub group
 					for attr, g := range groups {
 						if ok, _ := r.matchSiteAgainstList(g, domain); ok {
-							matchedList = append(matchedList, sc+"@"+attr)
+							matchedList = append(matchedList, code+"@"+attr)
 						}
 					}
 				}
-			} else {
-				return nil, err
 			}
 		}
 		return matchedList, nil
@@ -207,8 +218,16 @@ func (r *GSReader) Extract(wantList map[string][]string, regex bool) ([]string, 
 		return domains, err
 	}
 
-	geositeList, err = LoadV2Site(fileContent, wantList, r.MustExist)
+	v2site, err := LoadV2Site(fileContent)
+	codes = []string{}
+	for key := range wantList {
+		codes = append(codes, key)
+	}
 	if err == nil {
+		geositeList, err = v2site.ReadSites(codes, r.MustExist)
+	}
+	if err == nil {
+		defer v2site.Close()
 		domains, _, err := r.extractV2GeoSite(geositeList, wantList, regex, false)
 		if err == nil {
 			domains = common.Uniq(domains)
@@ -260,8 +279,18 @@ func (r *GSReader) ToGeosite(wantList map[string][]string) (*GeoSiteList, error)
 		return geolist, nil
 	}
 
-	geositeList, err := LoadV2Site(fileContent, codeList, r.MustExist)
+	var geositeList []GeoSite
+	v2site, err := LoadV2Site(fileContent)
+	codes = []string{}
+	for key := range wantList {
+		codes = append(codes, key)
+	}
 	if err == nil {
+		geositeList, err = v2site.ReadSites(codes, r.MustExist)
+		if err != nil {
+			return nil, err
+		}
+		defer v2site.Close()
 		for i := 0; i < len(geositeList); i++ {
 			geolist.Entry = append(geolist.Entry, &geositeList[i])
 		}
@@ -295,8 +324,17 @@ func (r *GSReader) ToRuleSet(wantList map[string][]string, regex bool) (*srs.Pla
 		return nil, err
 	}
 
-	geositeList, err = LoadV2Site(fileContent, wantList, r.MustExist)
+	v2site, err := LoadV2Site(fileContent)
+	codes = []string{}
+	for key := range wantList {
+		codes = append(codes, key)
+	}
 	if err == nil {
+		geositeList, err = v2site.ReadSites(codes, r.MustExist)
+		if err != nil {
+			return nil, err
+		}
+		defer v2site.Close()
 		_, itemlist, err := r.extractV2GeoSite(geositeList, wantList, regex, false)
 		if len(itemlist) == 0 {
 			return nil, errors.New("empty domain set")
@@ -325,8 +363,17 @@ func (r *GSReader) ToQuantumultX(wantList map[string][]string) ([]string, error)
 		return nil, err
 	}
 
-	geositeList, err = LoadV2Site(fileContent, wantList, r.MustExist)
+	v2site, err := LoadV2Site(fileContent)
+	codes = []string{}
+	for key := range wantList {
+		codes = append(codes, key)
+	}
 	if err == nil {
+		geositeList, err = v2site.ReadSites(codes, r.MustExist)
+		if err != nil {
+			return nil, err
+		}
+		defer v2site.Close()
 		_, itemlist, err := r.extractV2GeoSite(geositeList, wantList, false, true)
 		if err == nil {
 			return itemToQxRule(itemlist)

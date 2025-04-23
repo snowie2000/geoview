@@ -40,7 +40,7 @@ func LoadSingSite(data []byte) (reader *GeoSiteReader, codes []string, err error
 	return
 }
 
-func LoadSiteFromFile(path string) (*GeoSiteReader, []string, error) {
+func LoadSingSiteFromFile(path string) (*GeoSiteReader, []string, error) {
 	content, err := os.Open(path)
 	if err != nil {
 		return nil, nil, err
