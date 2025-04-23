@@ -1,0 +1,106 @@
+name: Build Go Binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag (e.g., 0.1.0)'
+        required: true
+        default: '0.1.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+          - arch: 386
+            filename: i386
+          - arch: arm
+            goarm: 5
+          - arch: arm
+            goarm: 6
+          - arch: arm
+            goarm: 7
+          - arch: arm64
+          - arch: mips
+          - arch: mipsle
+          - arch: mips64
+          - arch: mips64le
+          - arch: riscv64
+          - arch: amd64
+            goos: windows
+          - arch: 386
+            goos: windows
+
+    name: Build for ${{ matrix.goos || 'linux' }}-${{ matrix.arch }}${{ matrix.goarm && format(' (GOARM={0})', matrix.goarm) || '' }}
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      - name: Install UPX
+        uses: crazy-max/ghaction-upx@v3
+        with:
+          version: latest
+          install-only: true
+
+      - name: Build Binary
+        run: |
+          mkdir -p build
+
+          GOOS=${{ matrix.goos || 'linux' }}
+          GOARCH=${{ matrix.arch }}
+
+          if [[ "$GOARCH" == "386" && "$GOOS" == "windows" ]]; then
+            OUTPUT_FILE="geoview-windows-i386.exe"
+          elif [[ "$GOARCH" == "amd64" && "$GOOS" == "windows" ]]; then
+            OUTPUT_FILE="geoview-windows-amd64.exe"
+          elif [[ "$GOARCH" == "386" ]]; then
+            OUTPUT_FILE="geoview-linux-i386"
+          elif [[ "$GOARCH" == "arm" ]]; then
+            OUTPUT_FILE="geoview-linux-armv${{ matrix.goarm }}"
+          else
+            OUTPUT_FILE="geoview-linux-${GOARCH}"
+          fi
+
+          export GOARM=${{ matrix.goarm || '' }}
+          export CGO_ENABLED=0
+          GOOS=$GOOS GOARCH=$GOARCH GOARM=$GOARM \
+          go build -ldflags="-s -w" -o build/$OUTPUT_FILE main.go
+
+          if [[ "$GOARCH" != "mips64" && "$GOARCH" != "mips64le" && "$GOARCH" != "riscv64" ]]; then
+            upx --best build/$OUTPUT_FILE
+          else
+            echo "Skipping UPX compression for $OUTPUT_FILE (not supported)"
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          files: build/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup:
+    name: Cleanup Old Workflow Runs
+    runs-on: ubuntu-latest
+    needs: build
+    if: always()
+    steps:
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 0

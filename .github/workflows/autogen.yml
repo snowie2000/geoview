@@ -22,17 +22,17 @@ jobs:
       run: |
         sudo curl -L -o /opt/geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
         sudo curl -L -o /opt/geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-        sudo curl -L -o /opt/geoview_linux_amd64 https://github.com/snowie2000/geoview/releases/latest/download/geoview_linux_amd64
-        sudo chmod +x /opt/geoview_linux_amd64
+        sudo curl -L -o /opt/geoview-linux-amd64 https://github.com/snowie2000/geoview/releases/latest/download/geoview-linux-amd64
+        sudo chmod +x /opt/geoview-linux-amd64
 
     - name: Generate rules
       run: |
-        /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list gfw -type geosite -format qx -output /home/runner/work/geoview/geoview/gfw.conf
-        /opt/geoview_linux_amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -format qx -output /home/runner/work/geoview/geoview/gfw.conf
-        /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'geolocation-!cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/global.conf
-        /opt/geoview_linux_amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -format qx -output /home/runner/work/geoview/geoview/global.conf
-        /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/cn.conf
-        /opt/geoview_linux_amd64 -input /opt/geosite.dat -action convert -list 'category-ads' -type geosite -format qx -output /home/runner/work/geoview/geoview/ads.conf
+        /opt/geoview-linux-amd64 -input /opt/geosite.dat -action convert -list gfw -type geosite -format qx -output /home/runner/work/geoview/geoview/gfw.conf
+        /opt/geoview-linux-amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -format qx -output /home/runner/work/geoview/geoview/gfw.conf
+        /opt/geoview-linux-amd64 -input /opt/geosite.dat -action convert -list 'geolocation-!cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/global.conf
+        /opt/geoview-linux-amd64 -input /opt/geoip.dat -action convert -list telegram,cloudflare -append -format qx -output /home/runner/work/geoview/geoview/global.conf
+        /opt/geoview-linux-amd64 -input /opt/geosite.dat -action convert -list 'cn' -type geosite -format qx -output /home/runner/work/geoview/geoview/cn.conf
+        /opt/geoview-linux-amd64 -input /opt/geosite.dat -action convert -list 'category-ads' -type geosite -format qx -output /home/runner/work/geoview/geoview/ads.conf
 
     - name: Check for changes
       id: changes
