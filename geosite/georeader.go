@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -124,19 +125,34 @@ func (r *GSReader) extractSingGeoSite(geoReader *GeoSiteReader, codes []string, 
 }
 
 func (r *GSReader) matchSiteAgainstList(domains []*Domain, domain string) (bool, error) {
-	g := strmatcher.NewMphMatcherGroup()
-	for _, d := range domains {
-		matcherType, f := matcherTypeMap[d.Type]
-		if !f {
-			return false, errors.New("unsupported domain type")
+	domainCount := len(domains)
+	for i := 0; i < domainCount; i += 1000 {
+		var subDomain []*Domain
+		if i+1000 > domainCount {
+			subDomain = domains[i:]
+		} else {
+			subDomain = domains[i : i+1000]
 		}
-		_, err := g.AddPattern(d.Value, matcherType)
-		if err != nil {
-			return false, err
+		g := strmatcher.NewMphMatcherGroup()
+		for _, d := range subDomain {
+			matcherType, f := matcherTypeMap[d.Type]
+			if !f {
+				return false, errors.New("unsupported domain type")
+			}
+			_, err := g.AddPattern(d.Value, matcherType)
+			if err != nil {
+				return false, err
+			}
+		}
+		g.Build()
+		if len(g.Match(domain)) > 0 {
+			return true, nil
+		}
+		if domainCount-i > 1000 {
+			runtime.GC()
 		}
 	}
-	g.Build()
-	return len(g.Match(domain)) > 0, nil
+	return false, nil
 }
 
 // search for a domain in all geosite sites and return matched site codes

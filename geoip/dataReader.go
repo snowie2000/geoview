@@ -77,7 +77,7 @@ func (g *GeoIPDatIn) FindIP(ip string) (list []string) {
 	codeList := protohelper.CodeListByReader(file) // get all available geoip codes
 	// codeList := protohelper.CodeList(geoipBytes)
 	for _, code := range codeList {
-		file.Seek(0, int(code.Offset))
+		file.Seek(code.Offset, io.SeekStart)
 		var geoip GeoIP
 		stripped := make([]byte, code.Size)
 		io.ReadFull(file, stripped)
