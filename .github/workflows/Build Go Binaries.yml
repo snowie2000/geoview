@@ -50,7 +50,7 @@ jobs:
       - name: Install UPX
         uses: crazy-max/ghaction-upx@v3
         with:
-          version: latest
+          version: '4.2.4'
           install-only: true
 
       - name: Build Binary
