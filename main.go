@@ -24,7 +24,7 @@ var (
 )
 
 const (
-	VERSION string = "0.1.9"
+	VERSION string = "0.1.10"
 )
 
 func main() {

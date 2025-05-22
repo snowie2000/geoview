@@ -466,10 +466,10 @@ func singItemToV2(singItem []Item) []*Domain {
 }
 
 func v2ItemToSing(v2Item []*Domain) []Item {
-	var item Item
 	items := []Item{}
 
 	for _, domain := range v2Item {
+		var item Item
 		item.Value = domain.Value
 		switch domain.Type {
 		case Domain_Full:
