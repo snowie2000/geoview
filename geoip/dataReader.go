@@ -41,7 +41,7 @@ func (g *GeoIPDatIn) ToGeoIP() (*GeoIPList, error) {
 	codeList := protohelper.CodeListByReader(reader)
 	for _, code := range codeList {
 		if _, ok := g.Want[code.Name]; ok {
-			reader.Seek(0, int(code.Offset))
+			reader.Seek(code.Offset, io.SeekStart)
 			var geoip GeoIP
 			stripped := make([]byte, code.Size)
 			io.ReadFull(reader, stripped)
@@ -271,12 +271,14 @@ func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, entries map[s
 	ipStrList := make([]string, 0)
 	for _, code := range codeList {
 		if _, ok := g.Want[code.Name]; ok {
-			reader.Seek(0, int(code.Offset))
+			reader.Seek(code.Offset, io.SeekStart)
 			var geoip GeoIP
 			stripped := make([]byte, code.Size)
 			io.ReadFull(reader, stripped)
 			if stripped != nil {
-				proto.Unmarshal(stripped, &geoip)
+				if err := proto.Unmarshal(stripped, &geoip); err != nil {
+					return err
+				}
 
 				for _, v2rayCIDR := range geoip.Cidr {
 					ipStr := net.IP(v2rayCIDR.GetIp()).String() + "/" + fmt.Sprint(v2rayCIDR.GetPrefix())

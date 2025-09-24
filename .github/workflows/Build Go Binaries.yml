@@ -50,7 +50,7 @@ jobs:
       - name: Install UPX
         uses: crazy-max/ghaction-upx@v3
         with:
-          version: latest
+          version: 'v4.2.4'
           install-only: true
 
       - name: Build Binary
@@ -77,11 +77,11 @@ jobs:
           GOOS=$GOOS GOARCH=$GOARCH GOARM=$GOARM \
           go build -ldflags="-s -w" -o build/$OUTPUT_FILE main.go
 
-          if [[ "$GOARCH" != "mips64" && "$GOARCH" != "mips64le" && "$GOARCH" != "riscv64" ]]; then
-            upx --best build/$OUTPUT_FILE
-          else
-            echo "Skipping UPX compression for $OUTPUT_FILE (not supported)"
-          fi
+          # if [[ "$GOARCH" != "mips64" && "$GOARCH" != "mips64le" && "$GOARCH" != "riscv64" ]]; then
+          #   upx --best build/$OUTPUT_FILE
+          # else
+          #   echo "Skipping UPX compression for $OUTPUT_FILE (not supported)"
+          # fi
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
