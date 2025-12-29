@@ -5,16 +5,15 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/snowie2000/geoview/geoip"
+	"github.com/snowie2000/geoview/geosite"
+	"github.com/snowie2000/geoview/global"
 	"github.com/snowie2000/geoview/protohelper"
+	"github.com/snowie2000/geoview/srs"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"os"
 	"strings"
-
-	"github.com/snowie2000/geoview/geoip"
-	"github.com/snowie2000/geoview/geosite"
-	"github.com/snowie2000/geoview/global"
-	"github.com/snowie2000/geoview/srs"
 )
 
 var (
@@ -24,10 +23,15 @@ var (
 )
 
 const (
-	VERSION string = "0.1.11"
+	VERSION string = "0.2.0"
 )
 
 func main() {
+	//t := time.Now()
+	//defer func() {
+	//	elapsed := time.Since(t)
+	//	fmt.Println("finished in", elapsed)
+	//}()
 	myflag := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	myflag.StringVar(&global.Input, "input", "", "datafile")
 	myflag.StringVar(&global.Datatype, "type", "geoip", "datafile type: geoip | geosite")
@@ -82,6 +86,8 @@ func main() {
 	default:
 		printErrorln("Error: unknown action:", global.Action)
 	}
+	//elapsed := time.Since(t)
+	//fmt.Println("finished in", elapsed)
 	os.Exit(exitCode)
 }
 

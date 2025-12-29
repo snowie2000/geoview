@@ -22,6 +22,10 @@ var matcherTypeMap = map[Domain_Type]strmatcher.Type{
 	Domain_Full:   strmatcher.Full,
 }
 
+const (
+	DomainMatchBatch = 20000
+)
+
 type GSHandler interface {
 	Lookup(domain string) ([]string, error)
 	Extract(wantList map[string][]string, regex bool) ([]string, error)
@@ -125,15 +129,16 @@ func (r *GSReader) extractSingGeoSite(geoReader *GeoSiteReader, codes []string, 
 }
 
 func (r *GSReader) matchSiteAgainstList(domains []*Domain, domain string) (bool, error) {
+	domain = strings.ToLower(strings.TrimSpace(domain))
 	domainCount := len(domains)
-	for i := 0; i < domainCount; i += 1000 {
+	for i := 0; i < domainCount; i += DomainMatchBatch {
 		var subDomain []*Domain
-		if i+1000 > domainCount {
+		if i+DomainMatchBatch > domainCount {
 			subDomain = domains[i:]
 		} else {
-			subDomain = domains[i : i+1000]
+			subDomain = domains[i : i+DomainMatchBatch]
 		}
-		g := strmatcher.NewMphMatcherGroup()
+		g := strmatcher.NewMapMatcherGroup()
 		for _, d := range subDomain {
 			matcherType, f := matcherTypeMap[d.Type]
 			if !f {
@@ -148,7 +153,7 @@ func (r *GSReader) matchSiteAgainstList(domains []*Domain, domain string) (bool,
 		if len(g.Match(domain)) > 0 {
 			return true, nil
 		}
-		if domainCount-i > 1000 {
+		if domainCount-i > DomainMatchBatch {
 			runtime.GC()
 		}
 	}
