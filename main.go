@@ -8,6 +8,7 @@ import (
 	"github.com/snowie2000/geoview/geoip"
 	"github.com/snowie2000/geoview/geosite"
 	"github.com/snowie2000/geoview/global"
+	"github.com/snowie2000/geoview/memory"
 	"github.com/snowie2000/geoview/protohelper"
 	"github.com/snowie2000/geoview/srs"
 	"google.golang.org/protobuf/proto"
@@ -23,7 +24,7 @@ var (
 )
 
 const (
-	VERSION string = "0.2.0"
+	VERSION string = "0.2.1"
 )
 
 func main() {
@@ -32,6 +33,9 @@ func main() {
 	//	elapsed := time.Since(t)
 	//	fmt.Println("finished in", elapsed)
 	//}()
+
+	memory.SetDynamicMemoryLimit(0.80)
+
 	myflag := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	myflag.StringVar(&global.Input, "input", "", "datafile")
 	myflag.StringVar(&global.Datatype, "type", "geoip", "datafile type: geoip | geosite")

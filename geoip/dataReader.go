@@ -3,12 +3,10 @@ package geoip
 import (
 	"errors"
 	"fmt"
+	"github.com/snowie2000/geoview/global"
 	"io"
 	"net"
 	"os"
-	"runtime"
-
-	"github.com/snowie2000/geoview/global"
 
 	"github.com/snowie2000/geoview/protohelper"
 	"github.com/snowie2000/geoview/srs"
@@ -54,7 +52,7 @@ func (g *GeoIPDatIn) ToGeoIP() (*GeoIPList, error) {
 			} else {
 				// log.Println("code not found", code)
 			}
-			runtime.GC()
+			//runtime.GC()
 		}
 	}
 	return ipList, nil
@@ -248,7 +246,7 @@ func (g *GeoIPDatIn) generateEntries(reader io.ReadSeeker, entries map[string]*E
 	}
 
 	geoipBytes = nil
-	runtime.GC()
+	//runtime.GC()
 
 	entry := NewEntry("global")
 	counter := 0
@@ -257,7 +255,7 @@ func (g *GeoIPDatIn) generateEntries(reader io.ReadSeeker, entries map[string]*E
 			return err
 		}
 		if counter++; counter > 10000 {
-			runtime.GC()
+			//runtime.GC()
 			counter = 0
 		}
 	}
@@ -287,7 +285,7 @@ func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, entries map[s
 			} else if g.MustExist {
 				return fmt.Errorf("%s doesn't exist", code)
 			}
-			runtime.GC()
+			//runtime.GC()
 		}
 	}
 
@@ -298,7 +296,7 @@ func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, entries map[s
 			return err
 		}
 		if counter++; counter > 10000 {
-			runtime.GC()
+			//runtime.GC()
 			counter = 0
 		}
 	}

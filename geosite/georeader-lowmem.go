@@ -3,7 +3,6 @@ package geosite
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"sort"
 	"strings"
 
@@ -71,7 +70,7 @@ func (r *GSReaderLowMem) Lookup(domain string) ([]string, error) {
 				}
 			}
 			if gcCounter > 10 {
-				runtime.GC()
+				//runtime.GC()
 				gcCounter = 0
 			}
 		}

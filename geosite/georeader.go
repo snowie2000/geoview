@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime"
 	"sort"
 	"strings"
 
@@ -153,9 +152,9 @@ func (r *GSReader) matchSiteAgainstList(domains []*Domain, domain string) (bool,
 		if len(g.Match(domain)) > 0 {
 			return true, nil
 		}
-		if domainCount-i > DomainMatchBatch {
-			runtime.GC()
-		}
+		//if domainCount-i > DomainMatchBatch {
+		//	runtime.GC()
+		//}
 	}
 	return false, nil
 }
