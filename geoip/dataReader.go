@@ -6,6 +6,7 @@ import (
 	"github.com/snowie2000/geoview/global"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 
 	"github.com/snowie2000/geoview/protohelper"
@@ -77,26 +78,20 @@ func (g *GeoIPDatIn) FindIP(ip string) (list []string) {
 	for _, code := range codeList {
 		file.Seek(code.Offset, io.SeekStart)
 		var geoip GeoIP
+		var prefix netip.Prefix
 		stripped := make([]byte, code.Size)
 		io.ReadFull(file, stripped)
 		if stripped != nil {
 			proto.Unmarshal(stripped, &geoip)
-			entry := NewEntry("finder")
 			for _, v2rayCIDR := range geoip.Cidr {
-				ipStr := net.IP(v2rayCIDR.GetIp()).String() + "/" + fmt.Sprint(v2rayCIDR.GetPrefix())
-				if err := entry.AddPrefix(ipStr); err != nil {
-					return
-				}
-			}
-			if nip.Is4() {
-				// ipv4 check
-				if s, err := entry.GetIPv4Set(); err == nil && s.Contains(nip) {
-					list = append(list, code.Name)
-				}
-			} else {
-				// ipv6 check
-				if s, err := entry.GetIPv6Set(); err == nil && s.Contains(nip) {
-					list = append(list, code.Name)
+				vip := net.IP(v2rayCIDR.GetIp())
+				if is4 := vip.To4() != nil; is4 == nip.Is4() {
+					ipStr := vip.String() + "/" + fmt.Sprint(v2rayCIDR.GetPrefix())
+					prefix, _ = netip.ParsePrefix(ipStr)
+					if prefix.Contains(nip) {
+						list = append(list, code.Name)
+						break
+					}
 				}
 			}
 		} else {
