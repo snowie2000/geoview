@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"strconv"
 
 	"github.com/snowie2000/geoview/protohelper"
 	"github.com/snowie2000/geoview/srs"
@@ -102,31 +103,18 @@ func (g *GeoIPDatIn) FindIP(ip string) (list []string) {
 }
 
 func (g *GeoIPDatIn) Extract(ipType IPType) (list []string, err error) {
-	entries := make(map[string]*Entry)
-
-	err = g.parseFile(g.URI, entries)
+	//log.Println("extracting", ipType)
+	err, list = g.parseFile(g.URI, ipType)
+	//log.Println("file read")
 
 	if err != nil {
 		return nil, err
 	}
 
-	if len(entries) == 0 {
+	if len(list) == 0 {
 		return nil, fmt.Errorf("no match countrycode found")
 	}
-
-	var ignoreIPType IgnoreIPOption
-	if ipType&IPv4 == 0 {
-		ignoreIPType = IgnoreIPv4
-	}
-	if ipType&IPv6 == 0 {
-		ignoreIPType = IgnoreIPv6
-	}
-
-	for _, entry := range entries {
-		if t, err := entry.MarshalText(ignoreIPType); err == nil && t != nil {
-			list = append(list, t...)
-		}
-	}
+	//log.Println("complete")
 	return
 }
 
@@ -152,10 +140,24 @@ func (g *GeoIPDatIn) ToRuleSet(ipType IPType) (*srs.PlainRuleSetCompat, error) {
 
 func (g *GeoIPDatIn) ToQuantumultX(ipType IPType) ([]string, error) {
 	// extract ip rules from the database
-	entries := make(map[string]*Entry)
-	err := g.parseFile(g.URI, entries)
-	if err != nil {
-		return nil, err
+	var list4 []string
+	var list6 []string
+	err, list := g.parseFile(g.URI, IPv4)
+	if err == nil {
+		list4 = make([]string, len(list))
+		// now convert ip-cidr into qx filter format
+		for i, cidr := range list {
+			list4[i] = fmt.Sprintf("ip-cidr, %s, Proxy", cidr)
+		}
+	}
+
+	err, list = g.parseFile(g.URI, IPv6)
+	if err == nil {
+		list6 = make([]string, len(list))
+		// now convert ip-cidr into qx filter format
+		for i, cidr := range list {
+			list6[i] = fmt.Sprintf("ip6-cidr, %s, Proxy", cidr)
+		}
 	}
 
 	var ignoreIPType IPIgnoreType = ""
@@ -164,28 +166,6 @@ func (g *GeoIPDatIn) ToQuantumultX(ipType IPType) ([]string, error) {
 	}
 	if ipType&IPv6 == 0 {
 		ignoreIPType = IgIPv6
-	}
-	// separate ips into two lists
-	var list4 []string
-	var list6 []string
-	var it4 IgnoreIPOption = IgnoreIPv4
-	for _, entry := range entries {
-		if t, err := entry.MarshalText(it4); err == nil && t != nil {
-			list6 = append(list6, t...)
-		}
-	}
-	var it6 IgnoreIPOption = IgnoreIPv6
-	for _, entry := range entries {
-		if t, err := entry.MarshalText(it6); err == nil && t != nil {
-			list4 = append(list4, t...)
-		}
-	}
-	// now convert ip-cidr into qx filter format
-	for i, cidr := range list4 {
-		list4[i] = fmt.Sprintf("ip-cidr, %s, Proxy", cidr)
-	}
-	for i, cidr := range list6 {
-		list6[i] = fmt.Sprintf("ip6-cidr, %s, Proxy", cidr)
 	}
 	// return request lists
 	switch ignoreIPType {
@@ -201,30 +181,31 @@ func (g *GeoIPDatIn) ToQuantumultX(ipType IPType) ([]string, error) {
 	}
 }
 
-func (g *GeoIPDatIn) parseFile(path string, entries map[string]*Entry) error {
+func (g *GeoIPDatIn) parseFile(path string, iptype IPType) (error, []string) {
 	file, err := os.Open(path)
 	if err != nil {
-		return err
+		return err, nil
 	}
 	defer file.Close()
 
-	if err := g.generateEntries(file, entries); err != nil {
-		return err
-	}
-
-	return nil
+	return g.generateEntries(file, iptype)
 }
 
-func (g *GeoIPDatIn) generateEntries(reader io.ReadSeeker, entries map[string]*Entry) error {
+func (g *GeoIPDatIn) generateEntries(reader io.ReadSeeker, iptype IPType) (error, []string) {
 	if global.Lowmem {
-		return g.generateEntriesFromFile(reader, entries)
+		return g.generateEntriesFromFile(reader, iptype)
 	}
 
 	geoipBytes, err := io.ReadAll(reader)
 	if err != nil {
-		return err
+		return err, nil
 	}
-	ipStrList := make([]string, 0)
+	allowIPv4 := iptype&IPv4 != 0
+	allowIPv6 := iptype&IPv6 != 0
+	var (
+		ip   net.IP
+		list []string = nil
+	)
 	for code := range g.Want {
 		var geoip GeoIP
 		stripped := protohelper.FindCode(geoipBytes, []byte(code))
@@ -232,69 +213,56 @@ func (g *GeoIPDatIn) generateEntries(reader io.ReadSeeker, entries map[string]*E
 			proto.Unmarshal(stripped, &geoip)
 
 			for _, v2rayCIDR := range geoip.Cidr {
-				ipStr := net.IP(v2rayCIDR.GetIp()).String() + "/" + fmt.Sprint(v2rayCIDR.GetPrefix())
-				ipStrList = append(ipStrList, ipStr)
+				ip = net.IP(v2rayCIDR.GetIp())
+				if ip.To4() != nil && allowIPv4 {
+					list = append(list, ip.String()+"/"+strconv.Itoa(int(v2rayCIDR.GetPrefix())))
+				} else if allowIPv6 {
+					list = append(list, ip.String()+"/"+strconv.Itoa(int(v2rayCIDR.GetPrefix())))
+				}
 			}
 		} else if g.MustExist {
-			return fmt.Errorf("%s doesn't exist", code)
+			return fmt.Errorf("%s doesn't exist", code), nil
 		}
 	}
 
-	geoipBytes = nil
-	//runtime.GC()
-
-	entry := NewEntry("global")
-	counter := 0
-	for _, ip := range ipStrList {
-		if err := entry.AddPrefix(ip); err != nil {
-			return err
-		}
-		if counter++; counter > 10000 {
-			//runtime.GC()
-			counter = 0
-		}
-	}
-	entries["global"] = entry
-	return nil
+	return nil, list
 }
 
-func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, entries map[string]*Entry) error {
+func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, iptype IPType) (error, []string) {
 	reader.Seek(0, io.SeekStart)
 	codeList := protohelper.CodeListByReader(reader)
-	ipStrList := make([]string, 0)
+	allowIPv4 := iptype&IPv4 != 0
+	allowIPv6 := iptype&IPv6 != 0
+	var (
+		ip   net.IP
+		list []string = nil
+	)
 	for _, code := range codeList {
 		if _, ok := g.Want[code.Name]; ok {
 			reader.Seek(code.Offset, io.SeekStart)
 			var geoip GeoIP
 			stripped := make([]byte, code.Size)
 			io.ReadFull(reader, stripped)
+			//log.Println("code read")
 			if stripped != nil {
 				if err := proto.Unmarshal(stripped, &geoip); err != nil {
-					return err
+					return err, nil
 				}
+				//log.Println("protobuf ready")
 
 				for _, v2rayCIDR := range geoip.Cidr {
-					ipStr := net.IP(v2rayCIDR.GetIp()).String() + "/" + fmt.Sprint(v2rayCIDR.GetPrefix())
-					ipStrList = append(ipStrList, ipStr)
+					ip = net.IP(v2rayCIDR.GetIp())
+					if ip.To4() != nil && allowIPv4 {
+						list = append(list, ip.String()+"/"+strconv.Itoa(int(v2rayCIDR.GetPrefix())))
+					} else if allowIPv6 {
+						list = append(list, ip.String()+"/"+strconv.Itoa(int(v2rayCIDR.GetPrefix())))
+					}
 				}
 			} else if g.MustExist {
-				return fmt.Errorf("%s doesn't exist", code)
+				return fmt.Errorf("%s doesn't exist", code), nil
 			}
 			//runtime.GC()
 		}
 	}
-
-	entry := NewEntry("global")
-	counter := 0
-	for _, ip := range ipStrList {
-		if err := entry.AddPrefix(ip); err != nil {
-			return err
-		}
-		if counter++; counter > 10000 {
-			//runtime.GC()
-			counter = 0
-		}
-	}
-	entries["global"] = entry
-	return nil
+	return nil, list
 }
