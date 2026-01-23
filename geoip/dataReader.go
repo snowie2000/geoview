@@ -252,8 +252,10 @@ func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, iptype IPType
 
 				for _, v2rayCIDR := range geoip.Cidr {
 					ip = net.IP(v2rayCIDR.GetIp())
-					if ip.To4() != nil && allowIPv4 {
-						list = append(list, ip.String()+"/"+strconv.Itoa(int(v2rayCIDR.GetPrefix())))
+					if ip.To4() != nil {
+						if allowIPv4 {
+							list = append(list, ip.String()+"/"+strconv.Itoa(int(v2rayCIDR.GetPrefix())))
+						}
 					} else if allowIPv6 {
 						list = append(list, ip.String()+"/"+strconv.Itoa(int(v2rayCIDR.GetPrefix())))
 					}
