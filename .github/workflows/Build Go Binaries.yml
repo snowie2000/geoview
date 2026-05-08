@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release Tag (e.g., 0.1.0)'
+        description: 'Release Tag (e.g., 0.2.0)'
         required: true
-        default: '0.1.0'
+        default: '0.2.0'
 
 jobs:
   build:
@@ -40,17 +40,17 @@ jobs:
 
     steps:
       - name: Checkout Source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: Install UPX
-        uses: crazy-max/ghaction-upx@v3
+        uses: crazy-max/ghaction-upx@v4
         with:
-          version: 'v4.2.4'
+          version: latest
           install-only: true
 
       - name: Build Binary
@@ -84,7 +84,7 @@ jobs:
           # fi
 
       - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag }}
           files: build/*
