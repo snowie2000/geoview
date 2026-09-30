@@ -127,6 +127,64 @@ Format can be set by `-format` flag. abbr. is also accepted, such as `qx` for `q
 
 * Binary ruleset conversion doesn't support appending, it always creates a new file.
 
+## Create Geo* from plain text
+
+You can create geoip and geosite from a well-formatted text file.
+
+The format is universal for both file types
+
+For GeoIP:
+```txt
+#codename
+ipv4/mask
+
+#codename2
+ipv6/mask
+ipv6
+...
+```
+example:
+```txt
+#US
+1.1.1.1/16
+8.8.8.8/16
+
+#CN
+114.114.114.114
+223.5.5.5/8
+```
+
+For Geosite:
+```txt
+#codename
+domain
+domain @attr1 @attr2 ...
+full:full.domain.com @attr1 @attr2
+
+#codename2
+...
+```
+
+example:
+```txt
+#cn
+baidu.com @ads
+sohu.com
+qq.com
+google.com.cn
+full:ads.google.com.cn @ads
+
+#us
+google.com
+```
+Codenames are case-insensitive, they will be uppercased upon conversion.
+
+Domains must directly follow the `full:` prefix without spaces.
+
+No comment is allowed.
+
+**Text format is only supported in the convert action.**
+
 ## Low memory mode
 By adding `-lowmem` to the command, the program will read the file partially to reduce memory usage. This is useful when execute on devices with limited memory.
 

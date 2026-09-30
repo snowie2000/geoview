@@ -6,6 +6,7 @@ import (
 	"github.com/snowie2000/geoview/protohelper"
 	"io"
 	"os"
+	"slices"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -29,6 +30,14 @@ func (v *V2Site) Codes() (list []string) {
 func (v *V2Site) ReadSites(codes []string, exitOnError bool) ([]GeoSite, error) {
 	var geosite GeoSite
 	var geositeList []GeoSite
+
+	// use all codes if * is specified
+	if slices.Contains(codes, "*") {
+		codes = []string{}
+		for c := range v.codeList {
+			codes = append(codes, c)
+		}
+	}
 
 	for _, code := range codes {
 		if index, ok := v.codeList[code]; !ok && exitOnError {

@@ -24,7 +24,7 @@ var (
 )
 
 const (
-	VERSION string = "0.2.6"
+	VERSION string = "0.2.7"
 )
 
 func main() {
@@ -135,6 +135,22 @@ func listCodes() {
 	}
 }
 
+func isProtoBufBinary(f string) (bool, error) {
+	file, err := os.Open(f)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+	header := make([]byte, 16)
+	file.Read(header)
+	for _, c := range header {
+		if (c < 0x20 || c > 0xff) && (c != '\n' && c != '\r' && c != '\t') {
+			return true, nil // control characters are not allowed in, except enter and tab
+		}
+	}
+	return false, nil
+}
+
 func extract() {
 	switch global.Datatype {
 	case "geoip":
@@ -199,12 +215,45 @@ func extract() {
 }
 
 func convert() {
+	isBin, err := isProtoBufBinary(global.Input)
+	if err != nil {
+		printErrorln("Can't open input file", err)
+		return
+	}
 	switch global.Datatype {
 	case "geoip":
 		list := strings.Split(global.Want, ",")
 		wantMap := make(map[string]bool)
 		for _, v := range list {
 			wantMap[strings.ToUpper(strings.TrimSpace(v))] = true
+		}
+
+		if !isBin {
+			// save converted geoip to tmp folder and remove upon finish
+			tmpFile, err := os.CreateTemp("", "gvip-*.tmp")
+			defer func() {
+				tmpFile.Close()
+				os.Remove(tmpFile.Name())
+			}()
+			if err != nil {
+				printErrorf("Can't create temp file", err)
+				return
+			}
+			iplist, err := geoip.TxtToGeoIP(global.Input)
+			if err != nil {
+				printErrorf("Invalid geoip text file", err)
+				return
+			}
+			protoBytes, err := proto.Marshal(iplist)
+			if err == nil {
+				_, err = tmpFile.Write(protoBytes)
+				if err != nil {
+					printErrorf("Can't write to temp folder", err)
+					return
+				}
+				// point data to our converted file
+				global.Input = tmpFile.Name()
+			}
 		}
 		data := &geoip.GeoIPDatIn{
 			URI:       global.Input,
@@ -296,6 +345,36 @@ func convert() {
 			parts := strings.Split(strings.ToLower(v), "@") // attributes are lowercased
 			wantMap[strings.ToUpper(parts[0])] = parts[1:]
 		}
+
+		// convert text to geosite before processing
+		if !isBin {
+			// save converted geoip to tmp folder and remove upon finish
+			tmpFile, err := os.CreateTemp("", "gvsite-*.tmp")
+			defer func() {
+				tmpFile.Close()
+				os.Remove(tmpFile.Name())
+			}()
+			if err != nil {
+				printErrorf("Can't create temp file", err)
+				return
+			}
+			gs, err := geosite.TxtToGeosite(global.Input)
+			if err != nil {
+				printErrorf("Invalid geosite text file", err)
+				return
+			}
+			protoBytes, err := proto.Marshal(gs)
+			if err == nil {
+				_, err = tmpFile.Write(protoBytes)
+				if err != nil {
+					printErrorf("Can't write to temp folder", err)
+					return
+				}
+				// point data to our converted file
+				global.Input = tmpFile.Name()
+			}
+		}
+
 		// convert to the target format according to the format arg
 		switch global.Format {
 		case "json": // ruleset json

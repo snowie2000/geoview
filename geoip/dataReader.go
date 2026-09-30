@@ -3,7 +3,6 @@ package geoip
 import (
 	"errors"
 	"fmt"
-	"github.com/snowie2000/geoview/global"
 	"io"
 	"net"
 	"net/netip"
@@ -36,11 +35,12 @@ func (g *GeoIPDatIn) ToGeoIP() (*GeoIPList, error) {
 	}
 	defer reader.Close()
 
+	_, acceptAll := g.Want["*"]
 	ipList := new(GeoIPList)
 	reader.Seek(0, io.SeekStart)
 	codeList := protohelper.CodeListByReader(reader)
 	for _, code := range codeList {
-		if _, ok := g.Want[code.Name]; ok {
+		if _, ok := g.Want[code.Name]; ok || acceptAll {
 			reader.Seek(code.Offset, io.SeekStart)
 			var geoip GeoIP
 			stripped := make([]byte, code.Size)
@@ -188,9 +188,10 @@ func (g *GeoIPDatIn) parseFile(path string, iptype IPType) (error, []string) {
 	}
 	defer file.Close()
 
-	return g.generateEntries(file, iptype)
+	return g.generateEntriesFromFile(file, iptype)
 }
 
+/*
 func (g *GeoIPDatIn) generateEntries(reader io.ReadSeeker, iptype IPType) (error, []string) {
 	if global.Lowmem {
 		return g.generateEntriesFromFile(reader, iptype)
@@ -226,7 +227,7 @@ func (g *GeoIPDatIn) generateEntries(reader io.ReadSeeker, iptype IPType) (error
 	}
 
 	return nil, list
-}
+}*/
 
 func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, iptype IPType) (error, []string) {
 	reader.Seek(0, io.SeekStart)
@@ -237,8 +238,9 @@ func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, iptype IPType
 		ip   net.IP
 		list []string = nil
 	)
+	_, acceptAll := g.Want["*"]
 	for _, code := range codeList {
-		if _, ok := g.Want[code.Name]; ok {
+		if _, ok := g.Want[code.Name]; ok || acceptAll {
 			reader.Seek(code.Offset, io.SeekStart)
 			var geoip GeoIP
 			stripped := make([]byte, code.Size)

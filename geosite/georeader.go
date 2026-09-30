@@ -3,7 +3,6 @@ package geosite
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"sort"
 	"strings"
@@ -48,11 +47,9 @@ type GSReader struct {
 
 func (r *GSReader) extractV2GeoSite(geositeList []GeoSite, want map[string][]string, regex bool, keyword bool) (list []string, itemlist []Item, err error) {
 	match := false
+	_, acceptAll := want["*"]
 	for _, site := range geositeList {
-		if v, ok := want[strings.ToUpper(site.CountryCode)]; !ok {
-			log.Println(site.CountryCode, "not found", v)
-		}
-		if v, ok := want[strings.ToUpper(site.CountryCode)]; ok {
+		if v, ok := want[strings.ToUpper(site.CountryCode)]; ok || acceptAll {
 			domains := v2ItemToSing(site.Domain)
 			for _, it := range domains {
 				switch it.Type {
@@ -265,6 +262,7 @@ func (r *GSReader) ToGeosite(wantList map[string][]string) (*GeoSiteList, error)
 		return nil, err
 	}
 	codeList := make(map[string][]string)
+	_, acceptAll := wantList["*"]
 	for c := range wantList {
 		// remove duplicate codes, remove attributes
 		sn := strings.SplitN(c, "@", 2)
@@ -277,8 +275,8 @@ func (r *GSReader) ToGeosite(wantList map[string][]string) (*GeoSiteList, error)
 	geoReader, codes, err := LoadSingSite(fileContent)
 	if err == nil && len(codes) > 0 {
 		for _, code := range codes {
-			if _, ok := codeList[strings.ToUpper(code)]; !ok {
-				continue // skip unwanted codes
+			if _, ok := codeList[strings.ToUpper(code)]; !ok && !acceptAll {
+				continue // skip unwanted codes, if not accept All
 			}
 			tmpList := make(map[string][]string)
 			tmpList[code] = nil // the value never gets read
