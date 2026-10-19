@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/snowie2000/geoview/protohelper"
 	"github.com/snowie2000/geoview/srs"
@@ -240,7 +241,7 @@ func (g *GeoIPDatIn) generateEntriesFromFile(reader io.ReadSeeker, iptype IPType
 	)
 	_, acceptAll := g.Want["*"]
 	for _, code := range codeList {
-		if _, ok := g.Want[code.Name]; ok || acceptAll {
+		if _, ok := g.Want[strings.ToUpper(code.Name)]; ok || acceptAll {
 			reader.Seek(code.Offset, io.SeekStart)
 			var geoip GeoIP
 			stripped := make([]byte, code.Size)

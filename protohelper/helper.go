@@ -4,6 +4,7 @@ package protohelper
 import (
 	"io"
 	"log"
+	"strings"
 )
 
 type CodeIndex struct {
@@ -119,7 +120,7 @@ func CodeListByReader(data io.ReadSeeker) (list map[string]CodeIndex) {
 		if size > 0 {
 			code := make([]byte, size)
 			_, err = io.ReadFull(tracked, code)
-			list[string(code)] = CodeIndex{
+			list[strings.ToUpper(string(code))] = CodeIndex{
 				Name:   string(code),
 				Size:   int64(bodyL),
 				Offset: tracked.Offset() - int64(size) - 2,

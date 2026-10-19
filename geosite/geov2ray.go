@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/snowie2000/geoview/protohelper"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"os"
 	"slices"
-
-	"google.golang.org/protobuf/proto"
+	"strings"
 )
 
 type V2Site struct {
@@ -40,7 +40,7 @@ func (v *V2Site) ReadSites(codes []string, exitOnError bool) ([]GeoSite, error) 
 	}
 
 	for _, code := range codes {
-		if index, ok := v.codeList[code]; !ok && exitOnError {
+		if index, ok := v.codeList[strings.ToUpper(code)]; !ok && exitOnError {
 			return nil, fmt.Errorf("%s doesn't exist", code)
 		} else {
 			v.reader.Seek(index.Offset, io.SeekStart)
