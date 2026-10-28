@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -24,7 +25,7 @@ var (
 )
 
 const (
-	VERSION string = "0.2.8"
+	VERSION string = "0.2.9"
 )
 
 func main() {
@@ -141,9 +142,10 @@ func isProtoBufBinary(f string) (bool, error) {
 		return false, err
 	}
 	defer file.Close()
-	header := make([]byte, 16)
-	file.Read(header)
-	for _, c := range header {
+	freader := io.LimitReader(file, 1024)
+	buff := &bytes.Buffer{}
+	io.Copy(buff, freader)
+	for _, c := range buff.Bytes() {
 		if (c < 0x20 || c > 0xff) && (c != '\n' && c != '\r' && c != '\t') {
 			return true, nil // control characters are not allowed in, except enter and tab
 		}
